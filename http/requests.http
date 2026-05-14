@@ -1,0 +1,18 @@
+@sourceRepoUrl = https://github.com/my-org/my-source-repo
+@sourceBranchName = main
+@targetRepo = my-org/my-target-repo
+@eventType = event_type
+@installationId = 12345678
+
+### Create subscription
+
+POST http://localhost:3000/subscribers
+Content-Type: application/json
+
+{
+  "source_repo_url": "{{sourceRepoUrl}}",
+  "source_branch_name": "{{sourceBranchName}}",
+  "target_repo": "{{targetRepo}}",
+  "event_type": "{{eventType}}",
+  "gh_app_installation_id": {{installationId}}
+}
