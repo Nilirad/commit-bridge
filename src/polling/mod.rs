@@ -1,9 +1,7 @@
 //! Asynchronous task to periodically check for updated remote branches.
 
 use async_trait::async_trait;
-use std::time::Duration;
 
-use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::{
@@ -38,7 +36,7 @@ impl AsyncEngine for PollingEngine {
 async fn polling_loop(ctx: SharedContext) {
     loop {
         tokio::select! {
-            res = poll_branches(&ctx) => {followup_poll(res, &ctx.token).await}
+            res = poll_branches(&ctx) => {followup_poll(res, &ctx).await}
             _ = ctx.token.cancelled() => break,
         }
     }
@@ -52,7 +50,7 @@ async fn polling_loop(ctx: SharedContext) {
 /// <!-- LINKS -->
 /// [`TriggerEngine`]: crate::trigger::TriggerEngine
 async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
-    let updated_branches = gather_updated_branches(&ctx.db_pool, ctx.git_fetcher.as_ref()).await?;
+    let updated_branches = gather_updated_branches(ctx).await?;
     if updated_branches.is_empty() {
         return Ok(());
     }
@@ -82,16 +80,13 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
 }
 
 /// Handles polling results and puts the task to sleep.
-async fn followup_poll(res: Result<(), PollingError>, token: &CancellationToken) {
-    // TODO: Make polling cooldown configurable.
-    const SLEEP_SECS: u64 = 5 * 60;
-
+async fn followup_poll(res: Result<(), PollingError>, ctx: &SharedContext) {
     match res {
         Ok(_) => tokio::select! {
-            _ = tokio::time::sleep(Duration::from_secs(SLEEP_SECS)) => {}
-            _ = token.cancelled() => {}
+            _ = tokio::time::sleep(ctx.config.engine.polling_sleep) => {}
+            _ = ctx.token.cancelled() => {}
         },
-        Err(e) => handle_polling_error(e, token).await,
+        Err(e) => handle_polling_error(e, ctx).await,
     }
 }
 
@@ -123,10 +118,10 @@ mod tests {
         });
 
         let ctx = SharedContext {
+            config: crate::config::Config::default(),
             db_pool: pool.clone(),
             git_fetcher: mock_fetcher,
             token: CancellationToken::new(),
-            github_api_base_url: "".to_string(),
         };
 
         poll_branches(&ctx).await.unwrap();

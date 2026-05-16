@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
+    config::Config,
     error::FatalError,
     model::Subscriber,
     trigger::error::{AuthError, RequestError},
@@ -23,8 +24,12 @@ pub trait Authenticator {
 pub struct GitHubAuthenticator {
     /// The credentials to authenticate to the server.
     pub credentials: AuthCredentials,
+
     /// The HTTP client to make requests to the authentication server.
     pub http_client: reqwest::Client,
+
+    /// Application configuration.
+    pub config: Config,
 }
 
 #[async_trait]
@@ -33,8 +38,8 @@ impl Authenticator for GitHubAuthenticator {
         &self,
         subscriber: &Subscriber,
     ) -> Result<String, AuthError> {
-        let jwt = generate_gh_jwt(&self.credentials)?;
-        request_iat(&self.http_client, &jwt, subscriber).await
+        let jwt = generate_gh_jwt(&self.credentials, &self.config)?;
+        request_iat(&self.http_client, &jwt, subscriber, &self.config).await
     }
 }
 
@@ -84,18 +89,19 @@ pub fn get_auth_credentials() -> Result<AuthCredentials, FatalError> {
 ///
 /// <!-- LINKS -->
 /// [jwt_docs]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app
-pub(super) fn generate_gh_jwt(creds: &AuthCredentials) -> Result<String, AuthError> {
+pub(super) fn generate_gh_jwt(
+    creds: &AuthCredentials,
+    config: &Config,
+) -> Result<String, AuthError> {
     // TODO: Check if you should use Tokio API.
     let pem = std::fs::read(&creds.pem_path)?;
 
-    const CLOCK_DRIFT_BUFFER_SECS: u64 = 60;
-    const TOKEN_VALIDITY_SECS: u64 = 5 * 60;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
     let claims = GitHubClaims {
-        iat: now - CLOCK_DRIFT_BUFFER_SECS,
-        exp: now + TOKEN_VALIDITY_SECS,
+        iat: now - config.auth.clock_drift_buffer.as_secs(),
+        exp: now + config.auth.token_validity.as_secs(),
         iss: creds.client_id.to_string(),
     };
 
@@ -117,6 +123,7 @@ pub(super) async fn request_iat(
     http_client: &Client,
     jwt: &str,
     sub: &Subscriber,
+    config: &Config,
 ) -> Result<String, AuthError> {
     #[derive(serde::Deserialize)]
     struct IatResponse {
@@ -124,14 +131,14 @@ pub(super) async fn request_iat(
     }
 
     let api_url = format!(
-        "https://api.github.com/app/installations/{}/access_tokens",
-        sub.gh_app_installation_id
+        "{}/app/installations/{}/access_tokens",
+        config.github_api.base_url, sub.gh_app_installation_id
     );
     let response = http_client
         .post(&api_url)
         .bearer_auth(jwt)
-        .header("Accept", "application/vnd.github+json")
-        .header("X-GitHub-Api-Version", "2026-03-10")
+        .header("Accept", &config.github_api.accept_header)
+        .header("X-GitHub-Api-Version", &config.github_api.version)
         .send()
         .await?;
 

@@ -5,22 +5,16 @@ use sqlx::SqlitePool;
 use tracing::warn;
 
 use crate::{
-    error::CommitHashError,
-    model::Branch,
-    polling::{branch::BranchInfo, git::GitFetcher},
+    context::SharedContext, error::CommitHashError, model::Branch, polling::branch::BranchInfo,
 };
 
 /// Gathers stored branches that need to be updated.
 pub(super) async fn gather_updated_branches(
-    pool: &SqlitePool,
-    fetcher: &dyn GitFetcher,
+    ctx: &SharedContext,
 ) -> Result<Vec<BranchInfo>, sqlx::Error> {
-    // TODO: Make buffer size configurable.
-    const BUFFER_SIZE: usize = 3;
-
-    let branch_results = stream::iter(collect_branches(pool).await?)
-        .map(|b| BranchInfo::new(b, fetcher))
-        .buffer_unordered(BUFFER_SIZE)
+    let branch_results = stream::iter(collect_branches(&ctx.db_pool).await?)
+        .map(|b| BranchInfo::new(b, ctx.git_fetcher.as_ref()))
+        .buffer_unordered(ctx.config.database.polling_db_buffer_size)
         .collect::<Vec<Result<BranchInfo, CommitHashError>>>()
         .await;
 
