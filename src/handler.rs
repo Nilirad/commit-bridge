@@ -1,9 +1,12 @@
 //! Axum route handlers.
 
 use crate::error::HandlerError;
-use crate::model::{CreateSubscriber, Subscriber};
+use crate::model::{CreateSubscriber, Subscriber, UpdateSubscriber};
 use crate::state::AppState;
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::{Path, State},
+};
 use tracing::info;
 
 /// Stores a new [`Subscriber`] in the database.
@@ -27,6 +30,80 @@ pub async fn create_subscriber(
     info!("Registered new subscriber for branch ID {branch_id}: {subscriber:?}");
 
     Ok(Json(subscriber))
+}
+
+/// Retrieves all [`Subscriber`]s.
+pub async fn list_subscribers(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<Subscriber>>, HandlerError> {
+    let subscribers = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers")
+        .fetch_all(&state.db_pool)
+        .await?;
+    Ok(Json(subscribers))
+}
+
+/// Retrieves a specific [`Subscriber`] by ID.
+pub async fn get_subscriber(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<Subscriber>, HandlerError> {
+    let subscriber = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&state.db_pool)
+        .await?
+        .ok_or(HandlerError::NotFound)?;
+    Ok(Json(subscriber))
+}
+
+/// Updates an existing [`Subscriber`].
+pub async fn update_subscriber(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(payload): Json<UpdateSubscriber>,
+) -> Result<Json<Subscriber>, HandlerError> {
+    let mut query = "UPDATE subscribers SET ".to_string();
+    let mut updates = Vec::new();
+
+    if let Some(target_repo) = &payload.target_repo {
+        updates.push(format!("target_repo = '{}'", target_repo));
+    }
+    if let Some(event_type) = &payload.event_type {
+        updates.push(format!("event_type = '{}'", event_type));
+    }
+    if let Some(id) = payload.gh_app_installation_id {
+        updates.push(format!("gh_app_installation_id = {}", id));
+    }
+
+    if updates.is_empty() {
+        return get_subscriber(State(state), Path(id)).await;
+    }
+
+    query.push_str(&updates.join(", "));
+    query.push_str(", updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *");
+
+    let subscriber = sqlx::query_as::<_, Subscriber>(&query)
+        .bind(id)
+        .fetch_optional(&state.db_pool)
+        .await?
+        .ok_or(HandlerError::NotFound)?;
+
+    Ok(Json(subscriber))
+}
+
+/// Deletes a [`Subscriber`] by ID.
+pub async fn delete_subscriber(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<(), HandlerError> {
+    let result = sqlx::query("DELETE FROM subscribers WHERE id = ?")
+        .bind(id)
+        .execute(&state.db_pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(HandlerError::NotFound);
+    }
+    Ok(())
 }
 
 /// Gets the branch ID specified in the [`CreateSubscriber`] payload.
@@ -73,7 +150,7 @@ mod tests {
     use axum::extract::State;
 
     #[tokio::test]
-    async fn test_create_subscriber() {
+    async fn test_crud_subscriber() {
         let pool = create_test_db().await;
         let state = AppState {
             db_pool: pool.clone(),
@@ -86,14 +163,40 @@ mod tests {
             gh_app_installation_id: 1,
         };
 
-        let res = create_subscriber(State(state), Json(payload)).await;
-        assert!(res.is_ok());
-
-        // Verify in DB
-        let subscriber = sqlx::query!("SELECT target_repo FROM subscribers")
-            .fetch_one(&pool)
+        // Create
+        let res = create_subscriber(State(state.clone()), Json(payload))
             .await
             .unwrap();
-        assert_eq!(subscriber.target_repo, "https://github.com/org/target");
+        let id = res.id;
+
+        // List
+        let list = list_subscribers(State(state.clone())).await.unwrap();
+        assert_eq!(list.len(), 1);
+
+        // Get
+        let get = get_subscriber(State(state.clone()), Path(id))
+            .await
+            .unwrap();
+        assert_eq!(get.id, id);
+
+        // Update
+        let update_payload = UpdateSubscriber {
+            target_repo: Some("https://github.com/org/new-target".to_string()),
+            event_type: None,
+            gh_app_installation_id: None,
+        };
+        let updated = update_subscriber(State(state.clone()), Path(id), Json(update_payload))
+            .await
+            .unwrap();
+        assert_eq!(updated.target_repo, "https://github.com/org/new-target");
+
+        // Delete
+        delete_subscriber(State(state.clone()), Path(id))
+            .await
+            .unwrap();
+
+        // Verify delete
+        let get_after_delete = get_subscriber(State(state.clone()), Path(id)).await;
+        assert!(get_after_delete.is_err());
     }
 }
