@@ -13,7 +13,6 @@ use axum::{
     routing::{get, post},
 };
 use reqwest::Client;
-use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
@@ -67,24 +66,24 @@ async fn run_app() -> Result<(), FatalError> {
 
     crate::trigger::recover_stuck_tasks(&pool).await?;
 
-    let polling_engine = Arc::new(PollingEngine { ctx: ctx.clone() });
+    let polling_engine = PollingEngine { ctx: ctx.clone() };
 
     let authenticator = Box::new(GitHubAuthenticator {
         credentials: get_auth_credentials()?,
         http_client: http_client.clone(),
     });
-    let trigger_engine = Arc::new(TriggerEngine {
+    let trigger_engine = TriggerEngine {
         ctx,
         http_client,
         authenticator,
-    });
+    };
 
-    let async_engines: Vec<(Arc<dyn AsyncEngine>, &str)> = vec![
-        (polling_engine, "Starting polling engine"),
-        (trigger_engine, "Starting trigger engine"),
+    let engines: Vec<(Box<dyn AsyncEngine>, &str)> = vec![
+        (Box::new(polling_engine), "Starting polling engine"),
+        (Box::new(trigger_engine), "Starting trigger engine"),
     ];
 
-    for (engine, message) in async_engines {
+    for (engine, message) in engines {
         crate::engine::start_engine(engine, message);
     }
 
