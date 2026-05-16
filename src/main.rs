@@ -18,6 +18,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use crate::{
+    config::Config,
     context::SharedContext,
     engine::AsyncEngine,
     error::{ClientCreationError, FatalError},
@@ -29,6 +30,8 @@ use crate::{
     trigger::{GitHubAuthenticator, TriggerEngine, get_auth_credentials},
 };
 
+/// Server configuration module.
+mod config;
 mod context;
 mod engine;
 mod error;
@@ -52,10 +55,11 @@ type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 async fn run_app() -> Result<(), FatalError> {
     tracing_subscriber::fmt::init();
 
-    let pool = init_database().await?;
-    let http_client = build_http_client()?;
+    let config = Config::default();
+    let pool = init_database(&config).await?;
+    let http_client = build_http_client(&config)?;
 
-    let ctx = init_context(pool.clone());
+    let ctx = init_context(pool.clone(), config);
 
     crate::trigger::recover_stuck_tasks(&pool).await?;
 
@@ -66,25 +70,26 @@ async fn run_app() -> Result<(), FatalError> {
 
     let app = build_router(pool);
 
-    run_server(app, ctx.token.clone()).await
+    run_server(app, ctx.token.clone(), &ctx.config).await
 }
 
 /// Initializes the database pool.
-async fn init_database() -> Result<sqlx::SqlitePool, FatalError> {
+async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> {
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
-        .acquire_timeout(std::time::Duration::from_secs(3))
-        .connect("sqlite://relay.db?mode=rwc")
+        .acquire_timeout(config.database_timeout)
+        .connect(&config.database_url)
         .await?;
     Ok(pool)
 }
 
 /// Initializes the shared application context.
-fn init_context(pool: sqlx::SqlitePool) -> SharedContext {
+fn init_context(pool: sqlx::SqlitePool, config: Config) -> SharedContext {
     let token = CancellationToken::new();
     SharedContext {
+        config: config.clone(),
         db_pool: pool,
         token,
-        github_api_base_url: "https://api.github.com".to_string(),
+        github_api_base_url: config.github_api_base_url,
         git_fetcher: std::sync::Arc::new(crate::polling::git::MainGitFetcher),
     }
 }
@@ -96,6 +101,7 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
     let authenticator = Box::new(GitHubAuthenticator {
         credentials: get_auth_credentials()?,
         http_client: http_client.clone(),
+        config: ctx.config.clone(),
     });
     let trigger_engine = TriggerEngine {
         ctx: ctx.clone(),
@@ -128,11 +134,15 @@ fn build_router(pool: sqlx::SqlitePool) -> Router {
 }
 
 /// Runs the server.
-async fn run_server(app: Router, token: CancellationToken) -> Result<(), FatalError> {
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+async fn run_server(
+    app: Router,
+    token: CancellationToken,
+    config: &Config,
+) -> Result<(), FatalError> {
+    let listener = tokio::net::TcpListener::bind(&config.server_address)
         .await
         .map_err(FatalError::TcpBinding)?;
-    println!("Server listening on http://0.0.0.0:3000");
+    println!("Server listening on http://{}", config.server_address);
     axum::serve(listener, app)
         .await
         .map_err(FatalError::Serve)?;
@@ -143,10 +153,8 @@ async fn run_server(app: Router, token: CancellationToken) -> Result<(), FatalEr
 }
 
 /// Creates a new HTTP client.
-pub fn build_http_client() -> Result<Client, ClientCreationError> {
-    const USER_AGENT: &str = "nilirad-relay-server";
-
-    let client = Client::builder().user_agent(USER_AGENT).build()?;
+pub fn build_http_client(config: &Config) -> Result<Client, ClientCreationError> {
+    let client = Client::builder().user_agent(&config.user_agent).build()?;
 
     Ok(client)
 }

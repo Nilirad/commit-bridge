@@ -38,11 +38,10 @@ impl AsyncEngine for TriggerEngine {
 
 /// Controls whether to shut down the trigger engine or process a queued event.
 async fn trigger_loop(engine: &TriggerEngine) {
-    const QUEUE_POLLING_INTERVAL_SECS: u64 = 5;
     loop {
         tokio::select! {
             _ = engine.ctx.token.cancelled() => break,
-            _ = tokio::time::sleep(tokio::time::Duration::from_secs(QUEUE_POLLING_INTERVAL_SECS)) => {
+            _ = tokio::time::sleep(engine.ctx.config.trigger_queue_polling_interval) => {
                 if let Err(e) = process_queue(engine).await {
                     warn!("Error processing queue: {e}");
                 }
@@ -254,6 +253,7 @@ mod tests {
     )]
 
     use super::*;
+    use crate::config::Config;
     use crate::test_utils::{MockAuthenticator, MockGitFetcher};
     use std::sync::Arc;
 
@@ -329,6 +329,7 @@ mod tests {
 
         let engine = TriggerEngine {
             ctx: SharedContext {
+                config: Config::default(),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 github_api_base_url: "http://mock".to_string(),
@@ -401,6 +402,7 @@ mod tests {
 
         let engine = TriggerEngine {
             ctx: SharedContext {
+                config: Config::default(),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 github_api_base_url: mock_server.uri(),

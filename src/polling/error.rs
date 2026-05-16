@@ -1,9 +1,8 @@
 //! Handling for errors specific to the polling engine.
 
-use std::time::Duration;
+use crate::context::SharedContext;
 
 use thiserror::Error;
-use tokio_util::sync::CancellationToken;
 use tracing::{error, warn};
 
 /// An error that interrupted a polling loop iteration.
@@ -15,17 +14,14 @@ pub enum PollingError {
 }
 
 /// Handles polling engine errors.
-pub(super) async fn handle_polling_error(error: PollingError, token: &CancellationToken) {
+pub(super) async fn handle_polling_error(error: PollingError, ctx: &SharedContext) {
     match error {
-        PollingError::DatabaseOperation(e) => handle_sqlx_error(e, token).await,
+        PollingError::DatabaseOperation(e) => handle_sqlx_error(e, ctx).await,
     }
 }
 
 /// Handles SQLx errors.
-async fn handle_sqlx_error(error: sqlx::Error, token: &CancellationToken) {
-    // TODO: Make retry cooldown configurable.
-    const DB_ERROR_COOLDOWN_SECS: u64 = 5 * 60;
-
+async fn handle_sqlx_error(error: sqlx::Error, ctx: &SharedContext) {
     let critical;
     match error {
         sqlx::Error::Database(e) => {
@@ -49,8 +45,8 @@ async fn handle_sqlx_error(error: sqlx::Error, token: &CancellationToken) {
 
     if critical {
         tokio::select! {
-            _ = tokio::time::sleep(Duration::from_secs(DB_ERROR_COOLDOWN_SECS)) => {}
-            _ = token.cancelled() => {}
+            _ = tokio::time::sleep(ctx.config.polling_db_error_cooldown) => {}
+            _ = ctx.token.cancelled() => {}
         }
     }
 }
