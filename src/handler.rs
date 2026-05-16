@@ -61,28 +61,46 @@ pub async fn update_subscriber(
     Path(id): Path<i64>,
     Json(payload): Json<UpdateSubscriber>,
 ) -> Result<Json<Subscriber>, HandlerError> {
-    let mut query = "UPDATE subscribers SET ".to_string();
-    let mut updates = Vec::new();
+    let mut query_builder = sqlx::QueryBuilder::new("UPDATE subscribers SET ");
+    let mut first = true;
 
     if let Some(target_repo) = &payload.target_repo {
-        updates.push(format!("target_repo = '{}'", target_repo));
+        if !first {
+            query_builder.push(", ");
+        }
+        query_builder.push("target_repo = ");
+        query_builder.push_bind(target_repo);
+        first = false;
     }
     if let Some(event_type) = &payload.event_type {
-        updates.push(format!("event_type = '{}'", event_type));
+        if !first {
+            query_builder.push(", ");
+        }
+        query_builder.push("event_type = ");
+        query_builder.push_bind(event_type);
+        first = false;
     }
-    if let Some(id) = payload.gh_app_installation_id {
-        updates.push(format!("gh_app_installation_id = {}", id));
+    if let Some(gh_app_installation_id) = payload.gh_app_installation_id {
+        if !first {
+            query_builder.push(", ");
+        }
+        query_builder.push("gh_app_installation_id = ");
+        query_builder.push_bind(gh_app_installation_id);
+        first = false;
     }
 
-    if updates.is_empty() {
-        return get_subscriber(State(state), Path(id)).await;
+    // Always update updated_at
+    if !first {
+        query_builder.push(", ");
     }
+    query_builder.push("updated_at = CURRENT_TIMESTAMP");
 
-    query.push_str(&updates.join(", "));
-    query.push_str(", updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *");
+    query_builder.push(" WHERE id = ");
+    query_builder.push_bind(id);
+    query_builder.push(" RETURNING *");
 
-    let subscriber = sqlx::query_as::<_, Subscriber>(&query)
-        .bind(id)
+    let subscriber = query_builder
+        .build_query_as::<Subscriber>()
         .fetch_optional(&state.db_pool)
         .await?
         .ok_or(HandlerError::NotFound)?;
