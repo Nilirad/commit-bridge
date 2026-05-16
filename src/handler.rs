@@ -62,38 +62,25 @@ pub async fn update_subscriber(
     Json(payload): Json<UpdateSubscriber>,
 ) -> Result<Json<Subscriber>, HandlerError> {
     let mut query_builder = sqlx::QueryBuilder::new("UPDATE subscribers SET ");
-    let mut first = true;
+    let mut separated = query_builder.separated(", ");
 
     if let Some(target_repo) = &payload.target_repo {
-        if !first {
-            query_builder.push(", ");
-        }
-        query_builder.push("target_repo = ");
-        query_builder.push_bind(target_repo);
-        first = false;
+        separated
+            .push("target_repo = ")
+            .push_bind_unseparated(target_repo);
     }
     if let Some(event_type) = &payload.event_type {
-        if !first {
-            query_builder.push(", ");
-        }
-        query_builder.push("event_type = ");
-        query_builder.push_bind(event_type);
-        first = false;
+        separated
+            .push("event_type = ")
+            .push_bind_unseparated(event_type);
     }
     if let Some(gh_app_installation_id) = payload.gh_app_installation_id {
-        if !first {
-            query_builder.push(", ");
-        }
-        query_builder.push("gh_app_installation_id = ");
-        query_builder.push_bind(gh_app_installation_id);
-        first = false;
+        separated
+            .push("gh_app_installation_id = ")
+            .push_bind_unseparated(gh_app_installation_id);
     }
 
-    // Always update updated_at
-    if !first {
-        query_builder.push(", ");
-    }
-    query_builder.push("updated_at = CURRENT_TIMESTAMP");
+    separated.push("updated_at = CURRENT_TIMESTAMP");
 
     query_builder.push(" WHERE id = ");
     query_builder.push_bind(id);
