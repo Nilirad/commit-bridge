@@ -45,7 +45,7 @@ async fn handle_sqlx_error(error: sqlx::Error, ctx: &SharedContext) {
 
     if critical {
         tokio::select! {
-            _ = tokio::time::sleep(ctx.config.polling_db_error_cooldown) => {}
+            _ = tokio::time::sleep(ctx.config.database.polling_db_error_cooldown) => {}
             _ = ctx.token.cancelled() => {}
         }
     }

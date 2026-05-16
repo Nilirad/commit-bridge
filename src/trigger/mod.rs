@@ -42,7 +42,7 @@ async fn trigger_loop(engine: &TriggerEngine) {
     loop {
         tokio::select! {
             _ = engine.ctx.token.cancelled() => break,
-            _ = tokio::time::sleep(engine.ctx.config.trigger_queue_polling_interval) => {
+            _ = tokio::time::sleep(engine.ctx.config.engine.trigger_queue_polling_interval) => {
                 if let Err(e) = process_queue(engine).await {
                     warn!("Error processing queue: {e}");
                 }
@@ -116,8 +116,13 @@ async fn schedule_retry(
     e: WorkflowTriggerError,
 ) -> Result<(), WorkflowTriggerError> {
     let next_retry_count = trigger.retry_count + 1;
-    let max_attempts = engine.ctx.config.trigger_retry_max_attempts;
-    let backoff_base_secs = engine.ctx.config.trigger_retry_backoff_base.as_secs();
+    let max_attempts = engine.ctx.config.engine.trigger_retry_max_attempts;
+    let backoff_base_secs = engine
+        .ctx
+        .config
+        .engine
+        .trigger_retry_backoff_base
+        .as_secs();
 
     if next_retry_count as u32 >= max_attempts {
         tracing::warn!(
@@ -149,7 +154,7 @@ async fn schedule_retry(
 
 /// Recovers tasks that have been stuck in `PROCESSING` for too long.
 pub async fn recover_stuck_tasks(pool: &SqlitePool, config: &Config) -> Result<(), sqlx::Error> {
-    let threshold_seconds = config.stuck_task_threshold.as_secs();
+    let threshold_seconds = config.engine.stuck_task_threshold.as_secs();
     let threshold_str = format!("-{} seconds", threshold_seconds);
 
     sqlx::query(
@@ -222,7 +227,7 @@ async fn send_repository_dispatch(
 ) -> Result<(), WorkflowTriggerError> {
     let api_url = format!(
         "{}/repos/{}/dispatches",
-        engine.ctx.github_api_base_url, sub.target_repo
+        engine.ctx.config.github_api.base_url, sub.target_repo
     );
 
     let payload = serde_json::json!({
@@ -239,10 +244,10 @@ async fn send_repository_dispatch(
         .http_client
         .post(&api_url)
         .bearer_auth(iat)
-        .header("Accept", &engine.ctx.config.github_api_accept_header)
+        .header("Accept", &engine.ctx.config.github_api.accept_header)
         .header(
             "X-GitHub-Api-Version",
-            &engine.ctx.config.github_api_version,
+            &engine.ctx.config.github_api.version,
         )
         .json(&payload)
         .send()
@@ -354,7 +359,6 @@ mod tests {
                 config: Config::default(),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
-                github_api_base_url: "http://mock".to_string(),
                 git_fetcher: Arc::new(MockGitFetcher {
                     hash: "".to_string(),
                 }),
@@ -427,7 +431,6 @@ mod tests {
                 config: Config::default(),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
-                github_api_base_url: mock_server.uri(),
                 git_fetcher: Arc::new(MockGitFetcher {
                     hash: "".to_string(),
                 }),

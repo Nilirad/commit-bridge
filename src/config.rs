@@ -1,84 +1,147 @@
 use std::time::Duration;
 
-/// Application configuration.
-#[derive(Clone)]
+/// Holds all application-wide configuration settings.
+#[derive(Clone, Default)]
 pub struct Config {
-    /// User agent for HTTP requests.
-    pub user_agent: String,
+    /// Server-related configuration settings.
+    pub server: ServerConfig,
 
-    /// Base URL for the GitHub API.
-    pub github_api_base_url: String,
+    /// Database-related configuration settings.
+    pub database: DatabaseConfig,
 
-    /// Address the server listens on.
-    pub server_address: String,
+    /// GitHub API communication configuration settings.
+    pub github_api: GitHubApiConfig,
 
-    /// URL of the database.
-    pub database_url: String,
+    /// Asynchronous engine configuration settings.
+    pub engine: EngineConfig,
 
-    /// Timeout for database connection acquisition.
-    pub database_timeout: Duration,
-
-    /// Polling sleep duration.
-    pub polling_sleep: Duration,
-
-    /// Buffer size for database operations.
-    pub polling_db_buffer_size: usize,
-
-    /// Cooldown duration for database errors.
-    pub polling_db_error_cooldown: Duration,
-
-    /// Interval for polling the trigger queue.
-    pub trigger_queue_polling_interval: Duration,
-
-    /// Maximum number of retry attempts for a trigger.
-    pub trigger_retry_max_attempts: u32,
-
-    /// Base backoff duration for trigger retries.
-    pub trigger_retry_backoff_base: Duration,
-
-    /// Version of the GitHub API to use.
-    pub github_api_version: String,
-
-    /// Threshold duration for considering a task stuck.
-    pub stuck_task_threshold: Duration,
-
-    /// Clock drift buffer for authentication.
-    pub auth_clock_drift_buffer: Duration,
-
-    /// Validity duration for authentication tokens.
-    pub auth_token_validity: Duration,
-
-    /// Accept header for GitHub API requests.
-    pub github_api_accept_header: String,
-
-    /// Timeout for outgoing HTTP requests.
-    pub outgoing_http_timeout: Duration,
-
-    /// Timeout for incoming HTTP requests.
-    pub incoming_http_timeout: Duration,
+    /// Authentication configuration settings.
+    pub auth: AuthConfig,
 }
 
-impl Default for Config {
+/// Configuration for the HTTP server.
+#[derive(Clone)]
+pub struct ServerConfig {
+    /// The bind address for the server.
+    pub address: String,
+
+    /// The User-Agent string for HTTP requests.
+    pub user_agent: String,
+
+    /// Timeout duration for incoming HTTP requests.
+    pub in_request_timeout: Duration,
+
+    /// Timeout duration for outgoing HTTP requests.
+    pub out_request_timeout: Duration,
+}
+
+impl Default for ServerConfig {
     fn default() -> Self {
         Self {
+            address: "0.0.0.0:3000".to_string(),
             user_agent: "nilirad-relay-server".to_string(),
-            github_api_base_url: "https://api.github.com".to_string(),
-            server_address: "0.0.0.0:3000".to_string(),
-            database_url: "sqlite://relay.db?mode=rwc".to_string(),
-            database_timeout: Duration::from_secs(3),
-            polling_sleep: Duration::from_secs(5 * 60),
+            in_request_timeout: Duration::from_secs(30),
+            out_request_timeout: Duration::from_secs(30),
+        }
+    }
+}
+
+/// Configuration for the database connection.
+#[derive(Clone)]
+pub struct DatabaseConfig {
+    /// The connection URL for the database.
+    pub url: String,
+
+    /// The database connection timeout duration.
+    pub timeout: Duration,
+
+    /// The maximum size of the polling database buffer.
+    pub polling_db_buffer_size: usize,
+
+    /// The cooldown duration for polling database errors.
+    pub polling_db_error_cooldown: Duration,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            url: "sqlite://relay.db?mode=rwc".to_string(),
+            timeout: Duration::from_secs(3),
             polling_db_buffer_size: 3,
             polling_db_error_cooldown: Duration::from_secs(5 * 60),
+        }
+    }
+}
+
+/// Configuration for GitHub API interactions.
+#[derive(Clone)]
+pub struct GitHubApiConfig {
+    /// The base URL for the GitHub API.
+    pub base_url: String,
+
+    /// The specific GitHub API version to use.
+    pub version: String,
+
+    /// The value of the Accept header.
+    pub accept_header: String,
+}
+
+impl Default for GitHubApiConfig {
+    fn default() -> Self {
+        Self {
+            base_url: "https://api.github.com".to_string(),
+            version: "2026-03-10".to_string(),
+            accept_header: "application/vnd.github+json".to_string(),
+        }
+    }
+}
+
+/// Configuration for internal engine processes.
+#[derive(Clone)]
+pub struct EngineConfig {
+    /// Duration to sleep between polling cycles.
+    pub polling_sleep: Duration,
+
+    /// The interval for polling the trigger queue.
+    pub trigger_queue_polling_interval: Duration,
+
+    /// The maximum number of trigger retry attempts.
+    pub trigger_retry_max_attempts: u32,
+
+    /// The base duration for retry backoff.
+    pub trigger_retry_backoff_base: Duration,
+
+    /// The duration before a task is considered stuck.
+    pub stuck_task_threshold: Duration,
+}
+
+impl Default for EngineConfig {
+    fn default() -> Self {
+        Self {
+            polling_sleep: Duration::from_secs(5 * 60),
             trigger_queue_polling_interval: Duration::from_secs(5),
             trigger_retry_max_attempts: 10,
             trigger_retry_backoff_base: Duration::from_secs(10),
-            github_api_version: "2026-03-10".to_string(),
             stuck_task_threshold: Duration::from_secs(5 * 60),
-            auth_clock_drift_buffer: Duration::from_secs(60),
-            auth_token_validity: Duration::from_secs(5 * 60),
-            github_api_accept_header: "application/vnd.github+json".to_string(),
-            outgoing_http_timeout: Duration::from_secs(30),
-            incoming_http_timeout: Duration::from_secs(30),
+        }
+    }
+}
+
+/// Configuration for authentication mechanisms.
+#[derive(Clone)]
+pub struct AuthConfig {
+    /// Buffer time allowed for clock drift.
+    pub clock_drift_buffer: Duration,
+
+    /// Duration for which an authentication token is valid.
+    pub token_validity: Duration,
+}
+
+impl Default for AuthConfig {
+    fn default() -> Self {
+        Self {
+            clock_drift_buffer: Duration::from_secs(60),
+            token_validity: Duration::from_secs(5 * 60),
         }
     }
 }

@@ -83,7 +83,7 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
 async fn followup_poll(res: Result<(), PollingError>, ctx: &SharedContext) {
     match res {
         Ok(_) => tokio::select! {
-            _ = tokio::time::sleep(ctx.config.polling_sleep) => {}
+            _ = tokio::time::sleep(ctx.config.engine.polling_sleep) => {}
             _ = ctx.token.cancelled() => {}
         },
         Err(e) => handle_polling_error(e, ctx).await,
@@ -122,7 +122,6 @@ mod tests {
             db_pool: pool.clone(),
             git_fetcher: mock_fetcher,
             token: CancellationToken::new(),
-            github_api_base_url: "".to_string(),
         };
 
         poll_branches(&ctx).await.unwrap();

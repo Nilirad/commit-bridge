@@ -77,8 +77,8 @@ async fn run_app() -> Result<(), FatalError> {
 /// Initializes the database pool.
 async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> {
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
-        .acquire_timeout(config.database_timeout)
-        .connect(&config.database_url)
+        .acquire_timeout(config.database.timeout)
+        .connect(&config.database.url)
         .await?;
     Ok(pool)
 }
@@ -90,7 +90,6 @@ fn init_context(pool: sqlx::SqlitePool, config: Config) -> SharedContext {
         config: config.clone(),
         db_pool: pool,
         token,
-        github_api_base_url: config.github_api_base_url,
         git_fetcher: std::sync::Arc::new(crate::polling::git::MainGitFetcher),
     }
 }
@@ -134,7 +133,7 @@ fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
         .with_state(state)
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
-            config.incoming_http_timeout,
+            config.server.in_request_timeout,
         ))
 }
 
@@ -144,10 +143,10 @@ async fn run_server(
     token: CancellationToken,
     config: &Config,
 ) -> Result<(), FatalError> {
-    let listener = tokio::net::TcpListener::bind(&config.server_address)
+    let listener = tokio::net::TcpListener::bind(&config.server.address)
         .await
         .map_err(FatalError::TcpBinding)?;
-    println!("Server listening on http://{}", config.server_address);
+    println!("Server listening on http://{}", config.server.address);
     axum::serve(listener, app)
         .await
         .map_err(FatalError::Serve)?;
@@ -160,8 +159,8 @@ async fn run_server(
 /// Creates a new HTTP client.
 pub fn build_http_client(config: &Config) -> Result<Client, ClientCreationError> {
     let client = Client::builder()
-        .user_agent(&config.user_agent)
-        .timeout(config.outgoing_http_timeout)
+        .user_agent(&config.server.user_agent)
+        .timeout(config.server.out_request_timeout)
         .build()?;
 
     Ok(client)

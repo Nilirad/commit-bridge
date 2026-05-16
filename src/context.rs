@@ -15,8 +15,6 @@ pub struct SharedContext {
     pub db_pool: SqlitePool,
     /// Token to signal task cancellation.
     pub token: CancellationToken,
-    /// Base URL for the GitHub API.
-    pub github_api_base_url: String,
     /// Git fetcher for polling.
     pub git_fetcher: Arc<dyn GitFetcher>,
 }

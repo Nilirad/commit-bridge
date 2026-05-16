@@ -100,8 +100,8 @@ pub(super) fn generate_gh_jwt(
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
     let claims = GitHubClaims {
-        iat: now - config.auth_clock_drift_buffer.as_secs(),
-        exp: now + config.auth_token_validity.as_secs(),
+        iat: now - config.auth.clock_drift_buffer.as_secs(),
+        exp: now + config.auth.token_validity.as_secs(),
         iss: creds.client_id.to_string(),
     };
 
@@ -132,13 +132,13 @@ pub(super) async fn request_iat(
 
     let api_url = format!(
         "{}/app/installations/{}/access_tokens",
-        config.github_api_base_url, sub.gh_app_installation_id
+        config.github_api.base_url, sub.gh_app_installation_id
     );
     let response = http_client
         .post(&api_url)
         .bearer_auth(jwt)
-        .header("Accept", &config.github_api_accept_header)
-        .header("X-GitHub-Api-Version", &config.github_api_version)
+        .header("Accept", &config.github_api.accept_header)
+        .header("X-GitHub-Api-Version", &config.github_api.version)
         .send()
         .await?;
 
