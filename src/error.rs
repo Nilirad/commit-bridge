@@ -12,11 +12,19 @@ pub enum HandlerError {
     /// Database query execution failure.
     #[error("SQLx Error: {0}")]
     DbQuery(#[from] sqlx::Error),
+
+    /// Requested resource not found.
+    #[error("Not Found")]
+    NotFound,
 }
 
 impl IntoResponse for HandlerError {
     fn into_response(self) -> Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response()
+        let status = match self {
+            HandlerError::DbQuery(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            HandlerError::NotFound => StatusCode::NOT_FOUND,
+        };
+        (status, self.to_string()).into_response()
     }
 }
 

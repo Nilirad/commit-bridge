@@ -8,9 +8,10 @@
     clippy::indexing_slicing
 )]
 
+#[allow(unused_imports)]
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{delete, get, post, put},
 };
 use reqwest::Client;
 use tokio_util::sync::CancellationToken;
@@ -20,7 +21,9 @@ use crate::{
     context::SharedContext,
     engine::AsyncEngine,
     error::{ClientCreationError, FatalError},
-    handler::create_subscriber,
+    handler::{
+        create_subscriber, delete_subscriber, get_subscriber, list_subscribers, update_subscriber,
+    },
     polling::PollingEngine,
     state::AppState,
     trigger::{GitHubAuthenticator, TriggerEngine, get_auth_credentials},
@@ -111,7 +114,16 @@ fn build_router(pool: sqlx::SqlitePool) -> Router {
     let state = AppState { db_pool: pool };
     Router::new()
         .route("/health", get(|| async { "Relay Server is alive" }))
-        .route("/subscribers", post(create_subscriber))
+        .route(
+            "/subscribers",
+            post(create_subscriber).get(list_subscribers),
+        )
+        .route(
+            "/subscribers/:id",
+            get(get_subscriber)
+                .put(update_subscriber)
+                .delete(delete_subscriber),
+        )
         .with_state(state)
 }
 

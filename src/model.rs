@@ -82,6 +82,19 @@ pub struct CreateSubscriber {
     pub gh_app_installation_id: i64,
 }
 
+/// Holds payload data for the update of a [`Subscriber`].
+#[derive(Debug, Deserialize)]
+pub struct UpdateSubscriber {
+    /// Determines the value of [`Subscriber::target_repo`].
+    pub target_repo: Option<String>,
+
+    /// Determines the value of [`Subscriber::event_type`].
+    pub event_type: Option<String>,
+
+    /// Determines the value of [`Subscriber::gh_app_installation_id`].
+    pub gh_app_installation_id: Option<i64>,
+}
+
 /// Represents a row in the `trigger_queue` table.
 #[derive(Debug, FromRow)]
 pub struct TriggerQueueItem {
