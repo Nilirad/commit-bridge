@@ -12,17 +12,12 @@ pub enum PollingError {
     /// Could not read or write database.
     #[error("Database operation failed: {0}")]
     DatabaseOperation(#[from] sqlx::Error),
-
-    /// Could not serialize [`BranchUpdateEvent`].
-    #[error("Could not serialize branch update event: {0}")]
-    Serialization(#[from] serde_json::Error),
 }
 
 /// Handles polling engine errors.
 pub(super) async fn handle_polling_error(error: PollingError, token: &CancellationToken) {
     match error {
         PollingError::DatabaseOperation(e) => handle_sqlx_error(e, token).await,
-        PollingError::Serialization(e) => handle_serialization_error(e, token).await,
     }
 }
 
@@ -57,16 +52,5 @@ async fn handle_sqlx_error(error: sqlx::Error, token: &CancellationToken) {
             _ = tokio::time::sleep(Duration::from_secs(DB_ERROR_COOLDOWN_SECS)) => {}
             _ = token.cancelled() => {}
         }
-    }
-}
-
-/// Handles an error of type [`PollingError::Serialization`].
-async fn handle_serialization_error(error: serde_json::Error, token: &CancellationToken) {
-    const SERIALIZATION_ERROR_COOLDOWN_SECS: u64 = 5 * 60;
-
-    error!("{error}");
-    tokio::select! {
-        _ = tokio::time::sleep(Duration::from_secs(SERIALIZATION_ERROR_COOLDOWN_SECS)) => {}
-        _ = token.cancelled() => {}
     }
 }
