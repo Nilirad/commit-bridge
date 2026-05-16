@@ -1,18 +1,19 @@
 //! Asynchronous task to trigger remote repository workflows.
 
+use async_trait::async_trait;
 use reqwest::Client;
 use sqlx::SqlitePool;
 use tracing::{info, warn};
 
 use crate::{
     context::SharedContext,
+    engine::AsyncEngine,
     model::{Subscriber, TriggerQueueItem},
     trigger::error::{RequestError, WorkflowTriggerError},
 };
 
-pub use auth::*;
-
 mod auth;
+pub use auth::{Authenticator, GitHubAuthenticator, get_auth_credentials};
 pub mod error;
 
 /// Runs an asynchronous task
@@ -28,27 +29,21 @@ pub struct TriggerEngine {
     pub authenticator: Box<dyn Authenticator + Send + Sync>,
 }
 
-impl TriggerEngine {
-    /// Spawns an asynchronous task to trigger repository workflows.
-    ///
-    /// The spawned task will periodically read the `trigger_queue` table,
-    /// triggering a workflow for each event it processes.
-    pub fn start(self) {
-        tokio::spawn(async move {
-            info!("Trigger engine started");
-            trigger_loop(self).await;
-        });
+#[async_trait]
+impl AsyncEngine for TriggerEngine {
+    async fn run(&self) {
+        trigger_loop(self).await;
     }
 }
 
 /// Controls whether to shut down the trigger engine or process a queued event.
-async fn trigger_loop(engine: TriggerEngine) {
+async fn trigger_loop(engine: &TriggerEngine) {
     const QUEUE_POLLING_INTERVAL_SECS: u64 = 5;
     loop {
         tokio::select! {
             _ = engine.ctx.token.cancelled() => break,
             _ = tokio::time::sleep(tokio::time::Duration::from_secs(QUEUE_POLLING_INTERVAL_SECS)) => {
-                if let Err(e) = process_queue(&engine).await {
+                if let Err(e) = process_queue(engine).await {
                     warn!("Error processing queue: {e}");
                 }
             }
