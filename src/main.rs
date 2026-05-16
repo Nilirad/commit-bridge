@@ -42,30 +42,52 @@ async fn main() {
     run_app().await.unwrap_or_else(|e| error!("{e}"));
 }
 
+/// A task for an engine to be started.
+type EngineTask = (Box<dyn AsyncEngine>, &'static str);
+
 /// Runs the server, delegating errors to the caller.
 async fn run_app() -> Result<(), FatalError> {
     tracing_subscriber::fmt::init();
 
+    let pool = init_database().await?;
+    let http_client = build_http_client()?;
+
+    let ctx = init_context(pool.clone());
+
+    crate::trigger::recover_stuck_tasks(&pool).await?;
+
+    let engines = init_engines(&ctx, http_client)?;
+    for (engine, message) in engines {
+        crate::engine::start_engine(engine, message);
+    }
+
+    let app = build_router(pool);
+
+    run_server(app, ctx.token.clone()).await
+}
+
+/// Initializes the database pool.
+async fn init_database() -> Result<sqlx::SqlitePool, FatalError> {
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(3))
         .connect("sqlite://relay.db?mode=rwc")
         .await?;
-    let state = AppState {
-        db_pool: pool.clone(),
-    };
+    Ok(pool)
+}
 
-    let http_client = build_http_client()?;
-
+/// Initializes the shared application context.
+fn init_context(pool: sqlx::SqlitePool) -> SharedContext {
     let token = CancellationToken::new();
-    let ctx = SharedContext {
-        db_pool: pool.clone(),
-        token: token.clone(),
+    SharedContext {
+        db_pool: pool,
+        token,
         github_api_base_url: "https://api.github.com".to_string(),
         git_fetcher: std::sync::Arc::new(crate::polling::git::MainGitFetcher),
-    };
+    }
+}
 
-    crate::trigger::recover_stuck_tasks(&pool).await?;
-
+/// Initializes the background engines.
+fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTask>, FatalError> {
     let polling_engine = PollingEngine { ctx: ctx.clone() };
 
     let authenticator = Box::new(GitHubAuthenticator {
@@ -73,25 +95,29 @@ async fn run_app() -> Result<(), FatalError> {
         http_client: http_client.clone(),
     });
     let trigger_engine = TriggerEngine {
-        ctx,
+        ctx: ctx.clone(),
         http_client,
         authenticator,
     };
 
-    let engines: Vec<(Box<dyn AsyncEngine>, &str)> = vec![
+    Ok(vec![
         (Box::new(polling_engine), "Starting polling engine"),
         (Box::new(trigger_engine), "Starting trigger engine"),
-    ];
+    ])
+}
 
-    for (engine, message) in engines {
-        crate::engine::start_engine(engine, message);
-    }
-
-    let app = Router::new()
+/// Builds the application router.
+fn build_router(pool: sqlx::SqlitePool) -> Router {
+    let state = AppState { db_pool: pool };
+    Router::new()
         .route("/health", get(|| async { "Relay Server is alive" }))
         .route("/branches", post(create_branch))
         .route("/subscribers", post(create_subscriber))
-        .with_state(state);
+        .with_state(state)
+}
+
+/// Runs the server.
+async fn run_server(app: Router, token: CancellationToken) -> Result<(), FatalError> {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
         .map_err(FatalError::TcpBinding)?;
