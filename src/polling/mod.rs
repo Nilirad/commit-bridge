@@ -18,11 +18,28 @@ mod db;
 mod error;
 pub mod git;
 
+/// Runs an asynchronous task
+/// that periodically polls git branches in remote repositories.
+pub struct PollingEngine {
+    /// Shared data for all async engines.
+    pub ctx: SharedContext,
+}
+
+impl PollingEngine {
+    /// Spawns an asynchronous task to poll remote git branches.
+    pub fn start(self) {
+        tokio::spawn(async move {
+            info!("Polling engine started");
+            start_polling_engine(self).await;
+        });
+    }
+}
+
 /// Spawns an asynchronous task to periodically poll git branches for updates.
-pub fn start_polling_engine(ctx: SharedContext) {
+async fn start_polling_engine(engine: PollingEngine) {
     tokio::spawn(async move {
         info!("Polling engine started");
-        polling_loop(ctx).await;
+        polling_loop(engine.ctx).await;
     });
 }
 

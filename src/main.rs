@@ -20,6 +20,7 @@ use crate::{
     context::SharedContext,
     error::{ClientCreationError, FatalError},
     handler::{create_branch, create_subscriber},
+    polling::PollingEngine,
     state::AppState,
     trigger::{GitHubAuthenticator, TriggerEngine, get_auth_credentials},
 };
@@ -63,7 +64,7 @@ async fn run_app() -> Result<(), FatalError> {
 
     crate::trigger::recover_stuck_tasks(&pool).await?;
 
-    polling::start_polling_engine(ctx.clone());
+    let polling_engine = PollingEngine { ctx: ctx.clone() };
 
     let authenticator = Box::new(GitHubAuthenticator {
         credentials: get_auth_credentials()?,
@@ -75,6 +76,7 @@ async fn run_app() -> Result<(), FatalError> {
         authenticator,
     };
 
+    polling_engine.start();
     trigger_engine.start();
 
     let app = Router::new()
