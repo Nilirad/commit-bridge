@@ -13,11 +13,13 @@ use axum::{
     routing::{get, post},
 };
 use reqwest::Client;
+use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use crate::{
     context::SharedContext,
+    engine::AsyncEngine,
     error::{ClientCreationError, FatalError},
     handler::{create_branch, create_subscriber},
     polling::PollingEngine,
@@ -26,6 +28,7 @@ use crate::{
 };
 
 mod context;
+mod engine;
 mod error;
 mod handler;
 mod model;
@@ -64,20 +67,20 @@ async fn run_app() -> Result<(), FatalError> {
 
     crate::trigger::recover_stuck_tasks(&pool).await?;
 
-    let polling_engine = PollingEngine { ctx: ctx.clone() };
+    let polling_engine = Arc::new(PollingEngine { ctx: ctx.clone() });
 
     let authenticator = Box::new(GitHubAuthenticator {
         credentials: get_auth_credentials()?,
         http_client: http_client.clone(),
     });
-    let trigger_engine = TriggerEngine {
+    let trigger_engine = Arc::new(TriggerEngine {
         ctx,
         http_client,
         authenticator,
-    };
+    });
 
-    polling_engine.start();
-    trigger_engine.start();
+    polling_engine.clone().start("Polling engine started");
+    trigger_engine.clone().start("Trigger engine started");
 
     let app = Router::new()
         .route("/health", get(|| async { "Relay Server is alive" }))

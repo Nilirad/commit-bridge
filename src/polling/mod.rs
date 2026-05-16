@@ -1,5 +1,6 @@
 //! Asynchronous task to periodically check for updated remote branches.
 
+use async_trait::async_trait;
 use std::time::Duration;
 
 use tokio_util::sync::CancellationToken;
@@ -7,6 +8,7 @@ use tracing::info;
 
 use crate::{
     context::SharedContext,
+    engine::AsyncEngine,
     polling::{
         db::gather_updated_branches,
         error::{PollingError, handle_polling_error},
@@ -25,22 +27,11 @@ pub struct PollingEngine {
     pub ctx: SharedContext,
 }
 
-impl PollingEngine {
-    /// Spawns an asynchronous task to poll remote git branches.
-    pub fn start(self) {
-        tokio::spawn(async move {
-            info!("Polling engine started");
-            start_polling_engine(self).await;
-        });
+#[async_trait]
+impl AsyncEngine for PollingEngine {
+    async fn loop_function(&self) {
+        polling_loop(self.ctx.clone()).await;
     }
-}
-
-/// Spawns an asynchronous task to periodically poll git branches for updates.
-async fn start_polling_engine(engine: PollingEngine) {
-    tokio::spawn(async move {
-        info!("Polling engine started");
-        polling_loop(engine.ctx).await;
-    });
 }
 
 /// Controls whether to shut down the polling engine or run a polling cycle.
