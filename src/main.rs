@@ -79,8 +79,14 @@ async fn run_app() -> Result<(), FatalError> {
         authenticator,
     });
 
-    polling_engine.clone().start("Polling engine started");
-    trigger_engine.clone().start("Trigger engine started");
+    let async_engines: Vec<(Arc<dyn AsyncEngine>, &str)> = vec![
+        (polling_engine, "Starting polling engine"),
+        (trigger_engine, "Starting trigger engine"),
+    ];
+
+    for (engine, message) in async_engines {
+        crate::engine::start_engine(engine, message);
+    }
 
     let app = Router::new()
         .route("/health", get(|| async { "Relay Server is alive" }))

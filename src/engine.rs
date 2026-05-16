@@ -5,16 +5,17 @@ use std::sync::Arc;
 
 use tracing::info;
 
-/// Defines the interface of an asynchronous backround running engine.
+/// Defines the interface of an asynchronous background running engine.
 #[async_trait]
 pub trait AsyncEngine: Send + Sync + 'static {
-    /// Starts the engine.
-    fn start(self: Arc<Self>, message: &str) {
-        info!(message);
-        tokio::spawn(async move {
-            self.loop_function().await;
-        });
-    }
+    /// The core execution loop of the engine.
+    async fn run(&self);
+}
 
-    async fn loop_function(&self);
+/// Starts the engine by spawning it in a new task.
+pub fn start_engine<E: AsyncEngine + ?Sized>(engine: Arc<E>, message: &str) {
+    info!(message);
+    tokio::spawn(async move {
+        engine.run().await;
+    });
 }

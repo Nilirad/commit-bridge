@@ -29,7 +29,7 @@ pub struct PollingEngine {
 
 #[async_trait]
 impl AsyncEngine for PollingEngine {
-    async fn loop_function(&self) {
+    async fn run(&self) {
         polling_loop(self.ctx.clone()).await;
     }
 }

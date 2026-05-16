@@ -31,7 +31,7 @@ pub struct TriggerEngine {
 
 #[async_trait]
 impl AsyncEngine for TriggerEngine {
-    async fn loop_function(&self) {
+    async fn run(&self) {
         trigger_loop(self).await;
     }
 }
