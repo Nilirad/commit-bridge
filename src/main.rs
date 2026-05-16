@@ -59,9 +59,9 @@ async fn run_app() -> Result<(), FatalError> {
     let pool = init_database(&config).await?;
     let http_client = build_http_client(&config)?;
 
-    let ctx = init_context(pool.clone(), config);
+    let ctx = init_context(pool.clone(), config.clone());
 
-    crate::trigger::recover_stuck_tasks(&pool).await?;
+    crate::trigger::recover_stuck_tasks(&pool, &config).await?;
 
     let engines = init_engines(&ctx, http_client)?;
     for (engine, message) in engines {

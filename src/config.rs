@@ -30,6 +30,18 @@ pub struct Config {
     /// Interval for polling the trigger queue.
     pub trigger_queue_polling_interval: Duration,
 
+    /// Maximum number of retry attempts for a trigger.
+    pub trigger_retry_max_attempts: u32,
+
+    /// Base backoff duration for trigger retries.
+    pub trigger_retry_backoff_base: Duration,
+
+    /// Version of the GitHub API to use.
+    pub github_api_version: String,
+
+    /// Threshold duration for considering a task stuck.
+    pub stuck_task_threshold: Duration,
+
     /// Clock drift buffer for authentication.
     pub auth_clock_drift_buffer: Duration,
 
@@ -49,6 +61,10 @@ impl Default for Config {
             polling_db_buffer_size: 3,
             polling_db_error_cooldown: Duration::from_secs(5 * 60),
             trigger_queue_polling_interval: Duration::from_secs(5),
+            trigger_retry_max_attempts: 10,
+            trigger_retry_backoff_base: Duration::from_secs(10),
+            github_api_version: "2026-03-10".to_string(),
+            stuck_task_threshold: Duration::from_secs(5 * 60),
             auth_clock_drift_buffer: Duration::from_secs(60),
             auth_token_validity: Duration::from_secs(5 * 60),
         }

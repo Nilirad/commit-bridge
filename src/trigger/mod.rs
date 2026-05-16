@@ -6,6 +6,7 @@ use sqlx::SqlitePool;
 use tracing::{info, warn};
 
 use crate::{
+    config::Config,
     context::SharedContext,
     engine::AsyncEngine,
     model::{Subscriber, TriggerQueueItem},
@@ -115,9 +116,15 @@ async fn schedule_retry(
     e: WorkflowTriggerError,
 ) -> Result<(), WorkflowTriggerError> {
     let next_retry_count = trigger.retry_count + 1;
+    let max_attempts = engine.ctx.config.trigger_retry_max_attempts;
+    let backoff_base_secs = engine.ctx.config.trigger_retry_backoff_base.as_secs();
 
-    if next_retry_count >= 10 {
-        tracing::warn!("Task {} failed after 10 attempts: {e}", trigger.id);
+    if next_retry_count as u32 >= max_attempts {
+        tracing::warn!(
+            "Task {} failed after {} attempts: {e}",
+            trigger.id,
+            max_attempts
+        );
         sqlx::query!(
             "UPDATE trigger_queue SET status = 'FAILED', retry_count = ? WHERE id = ?",
             next_retry_count,
@@ -126,22 +133,32 @@ async fn schedule_retry(
         .execute(&engine.ctx.db_pool)
         .await?;
     } else {
-        let backoff_secs = 10 * (1 << (next_retry_count - 1));
-        sqlx::query!("UPDATE trigger_queue SET status = 'PENDING', retry_count = ?, next_retry_at = datetime('now', ? || ' seconds') WHERE id = ?",
-            next_retry_count, backoff_secs, trigger.id).execute(&engine.ctx.db_pool).await?;
+        let backoff_secs = (backoff_base_secs * (1 << (next_retry_count - 1))) as i64;
+        sqlx::query!(
+            "UPDATE trigger_queue SET status = 'PENDING', retry_count = ?, next_retry_at = datetime('now', ? || ' seconds') WHERE id = ?",
+            next_retry_count,
+            backoff_secs,
+            trigger.id
+        )
+        .execute(&engine.ctx.db_pool)
+        .await?;
     }
 
     Ok(())
 }
 
 /// Recovers tasks that have been stuck in `PROCESSING` for too long.
-pub async fn recover_stuck_tasks(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-    sqlx::query!(
+pub async fn recover_stuck_tasks(pool: &SqlitePool, config: &Config) -> Result<(), sqlx::Error> {
+    let threshold_seconds = config.stuck_task_threshold.as_secs();
+    let threshold_str = format!("-{} seconds", threshold_seconds);
+
+    sqlx::query(
         "UPDATE trigger_queue
          SET status = 'PENDING', status_updated_at = CURRENT_TIMESTAMP
          WHERE status = 'PROCESSING'
-           AND status_updated_at < DATETIME('now', '-5 minutes')"
+           AND status_updated_at < DATETIME('now', ?)",
     )
+    .bind(threshold_str)
     .execute(pool)
     .await?;
     Ok(())
@@ -223,7 +240,10 @@ async fn send_repository_dispatch(
         .post(&api_url)
         .bearer_auth(iat)
         .header("Accept", "application/vnd.github+json")
-        .header("X-GitHub-Api-Version", "2026-03-10")
+        .header(
+            "X-GitHub-Api-Version",
+            &engine.ctx.config.github_api_version,
+        )
         .json(&payload)
         .send()
         .await?;
@@ -276,7 +296,9 @@ mod tests {
         sqlx::query!("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now'))",
             1, "hash", "PENDING", 0).execute(&pool).await.unwrap();
 
-        recover_stuck_tasks(&pool).await.unwrap();
+        recover_stuck_tasks(&pool, &Config::default())
+            .await
+            .unwrap();
 
         // Check status
         let tasks = sqlx::query!("SELECT status FROM trigger_queue ORDER BY rowid")

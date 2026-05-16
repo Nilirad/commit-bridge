@@ -39,7 +39,7 @@ impl Authenticator for GitHubAuthenticator {
         subscriber: &Subscriber,
     ) -> Result<String, AuthError> {
         let jwt = generate_gh_jwt(&self.credentials, &self.config)?;
-        request_iat(&self.http_client, &jwt, subscriber).await
+        request_iat(&self.http_client, &jwt, subscriber, &self.config).await
     }
 }
 
@@ -123,6 +123,7 @@ pub(super) async fn request_iat(
     http_client: &Client,
     jwt: &str,
     sub: &Subscriber,
+    config: &Config,
 ) -> Result<String, AuthError> {
     #[derive(serde::Deserialize)]
     struct IatResponse {
@@ -130,14 +131,14 @@ pub(super) async fn request_iat(
     }
 
     let api_url = format!(
-        "https://api.github.com/app/installations/{}/access_tokens",
-        sub.gh_app_installation_id
+        "{}/app/installations/{}/access_tokens",
+        config.github_api_base_url, sub.gh_app_installation_id
     );
     let response = http_client
         .post(&api_url)
         .bearer_auth(jwt)
         .header("Accept", "application/vnd.github+json")
-        .header("X-GitHub-Api-Version", "2026-03-10")
+        .header("X-GitHub-Api-Version", &config.github_api_version)
         .send()
         .await?;
 
