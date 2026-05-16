@@ -30,16 +30,6 @@ pub struct Branch {
     pub updated_at: String,
 }
 
-/// Holds payload data for the creation of a [`Branch`].
-#[derive(Debug, Deserialize)]
-pub struct CreateBranch {
-    /// Determines the value of [`Branch::repo_url`].
-    pub repo_url: String,
-
-    /// Determines the value of [`Branch::name`].
-    pub name: String,
-}
-
 /// Represents a row in the `subscribers` table.
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Subscriber {

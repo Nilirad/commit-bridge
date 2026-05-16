@@ -20,7 +20,7 @@ use crate::{
     context::SharedContext,
     engine::AsyncEngine,
     error::{ClientCreationError, FatalError},
-    handler::{create_branch, create_subscriber},
+    handler::create_subscriber,
     polling::PollingEngine,
     state::AppState,
     trigger::{GitHubAuthenticator, TriggerEngine, get_auth_credentials},
@@ -111,7 +111,6 @@ fn build_router(pool: sqlx::SqlitePool) -> Router {
     let state = AppState { db_pool: pool };
     Router::new()
         .route("/health", get(|| async { "Relay Server is alive" }))
-        .route("/branches", post(create_branch))
         .route("/subscribers", post(create_subscriber))
         .with_state(state)
 }

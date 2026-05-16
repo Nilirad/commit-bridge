@@ -1,28 +1,10 @@
 //! Axum route handlers.
 
 use crate::error::HandlerError;
-use crate::model::{Branch, CreateBranch, CreateSubscriber, Subscriber};
+use crate::model::{CreateSubscriber, Subscriber};
 use crate::state::AppState;
 use axum::{Json, extract::State};
 use tracing::info;
-
-/// Stores a new [`Branch`] in the database.
-pub async fn create_branch(
-    State(state): State<AppState>,
-    Json(payload): Json<CreateBranch>,
-) -> Result<Json<Branch>, HandlerError> {
-    let branch = sqlx::query_as::<_, Branch>(
-        "INSERT INTO branches (repo_url, name) VALUES (?, ?) RETURNING *",
-    )
-    .bind(&payload.repo_url)
-    .bind(&payload.name)
-    .fetch_one(&state.db_pool)
-    .await?;
-
-    info!("Tracked new git branch: {:?}", branch);
-
-    Ok(Json(branch))
-}
 
 /// Stores a new [`Subscriber`] in the database.
 pub async fn create_subscriber(
