@@ -13,8 +13,9 @@ use axum::{
     Router,
     routing::{delete, get, post, put},
 };
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use tokio_util::sync::CancellationToken;
+use tower_http::timeout::TimeoutLayer;
 use tracing::error;
 
 use crate::{
@@ -68,7 +69,7 @@ async fn run_app() -> Result<(), FatalError> {
         crate::engine::start_engine(engine, message);
     }
 
-    let app = build_router(pool);
+    let app = build_router(pool, &config);
 
     run_server(app, ctx.token.clone(), &ctx.config).await
 }
@@ -116,7 +117,7 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
 }
 
 /// Builds the application router.
-fn build_router(pool: sqlx::SqlitePool) -> Router {
+fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
     let state = AppState { db_pool: pool };
     Router::new()
         .route("/health", get(|| async { "Relay Server is alive" }))
@@ -131,6 +132,10 @@ fn build_router(pool: sqlx::SqlitePool) -> Router {
                 .delete(delete_subscriber),
         )
         .with_state(state)
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            config.incoming_http_timeout,
+        ))
 }
 
 /// Runs the server.
@@ -154,7 +159,10 @@ async fn run_server(
 
 /// Creates a new HTTP client.
 pub fn build_http_client(config: &Config) -> Result<Client, ClientCreationError> {
-    let client = Client::builder().user_agent(&config.user_agent).build()?;
+    let client = Client::builder()
+        .user_agent(&config.user_agent)
+        .timeout(config.outgoing_http_timeout)
+        .build()?;
 
     Ok(client)
 }

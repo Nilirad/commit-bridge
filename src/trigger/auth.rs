@@ -137,7 +137,7 @@ pub(super) async fn request_iat(
     let response = http_client
         .post(&api_url)
         .bearer_auth(jwt)
-        .header("Accept", "application/vnd.github+json")
+        .header("Accept", &config.github_api_accept_header)
         .header("X-GitHub-Api-Version", &config.github_api_version)
         .send()
         .await?;

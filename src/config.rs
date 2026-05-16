@@ -47,6 +47,15 @@ pub struct Config {
 
     /// Validity duration for authentication tokens.
     pub auth_token_validity: Duration,
+
+    /// Accept header for GitHub API requests.
+    pub github_api_accept_header: String,
+
+    /// Timeout for outgoing HTTP requests.
+    pub outgoing_http_timeout: Duration,
+
+    /// Timeout for incoming HTTP requests.
+    pub incoming_http_timeout: Duration,
 }
 
 impl Default for Config {
@@ -67,6 +76,9 @@ impl Default for Config {
             stuck_task_threshold: Duration::from_secs(5 * 60),
             auth_clock_drift_buffer: Duration::from_secs(60),
             auth_token_validity: Duration::from_secs(5 * 60),
+            github_api_accept_header: "application/vnd.github+json".to_string(),
+            outgoing_http_timeout: Duration::from_secs(30),
+            incoming_http_timeout: Duration::from_secs(30),
         }
     }
 }

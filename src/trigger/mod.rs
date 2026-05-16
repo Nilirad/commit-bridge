@@ -239,7 +239,7 @@ async fn send_repository_dispatch(
         .http_client
         .post(&api_url)
         .bearer_auth(iat)
-        .header("Accept", "application/vnd.github+json")
+        .header("Accept", &engine.ctx.config.github_api_accept_header)
         .header(
             "X-GitHub-Api-Version",
             &engine.ctx.config.github_api_version,
