@@ -8,10 +8,13 @@
     clippy::indexing_slicing
 )]
 
+use axum::body::Body;
 #[allow(unused_imports)]
 use axum::{
     Router,
-    routing::{delete, get, post, put},
+    http::{HeaderValue, Request, Response, header},
+    middleware::{self, Next},
+    routing::{delete, get, patch, post},
 };
 use reqwest::{Client, StatusCode};
 use tokio_util::sync::CancellationToken;
@@ -42,6 +45,8 @@ mod polling;
 mod state;
 #[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+mod tests;
 mod trigger;
 
 #[tokio::main]
@@ -115,21 +120,33 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
     ])
 }
 
+/// Middleware to set Cache-Control header.
+async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
+    let mut response = next.run(req).await;
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-cache, no-store, must-revalidate, max-age=0"),
+    );
+    response
+}
+
 /// Builds the application router.
-fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
+pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
     let state = AppState { db_pool: pool };
-    Router::new()
-        .route("/health", get(|| async { "Relay Server is alive" }))
+
+    let subscribers = Router::new()
+        .route("/", post(create_subscriber).get(list_subscribers))
         .route(
-            "/subscribers",
-            post(create_subscriber).get(list_subscribers),
-        )
-        .route(
-            "/subscribers/:id",
+            "/{id}",
             get(get_subscriber)
-                .put(update_subscriber)
+                .patch(update_subscriber)
                 .delete(delete_subscriber),
         )
+        .layer(middleware::from_fn(set_no_cache_header));
+
+    Router::new()
+        .route("/health", get(|| async { "Relay Server is alive" }))
+        .nest("/subscribers", subscribers)
         .with_state(state)
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,

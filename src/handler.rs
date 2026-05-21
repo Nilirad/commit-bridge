@@ -1,7 +1,9 @@
 //! Axum route handlers.
 
 use crate::error::HandlerError;
-use crate::model::{CreateSubscriber, Subscriber, UpdateSubscriber};
+use crate::model::{
+    CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, UpdateSubscriber,
+};
 use crate::state::AppState;
 use axum::{
     Json,
@@ -9,11 +11,30 @@ use axum::{
 };
 use tracing::info;
 
+/// Maps a [`Subscriber`] to its HAL representation.
+fn map_to_hal(subscriber: Subscriber) -> SubscriberHal {
+    let id = subscriber.id;
+    SubscriberHal {
+        subscriber,
+        links: SubscriberLinks {
+            self_link: HalLink {
+                href: format!("/subscribers/{}", id),
+            },
+            update: HalLink {
+                href: format!("/subscribers/{}", id),
+            },
+            delete: HalLink {
+                href: format!("/subscribers/{}", id),
+            },
+        },
+    }
+}
+
 /// Stores a new [`Subscriber`] in the database.
 pub async fn create_subscriber(
     State(state): State<AppState>,
     Json(payload): Json<CreateSubscriber>,
-) -> Result<Json<Subscriber>, HandlerError> {
+) -> Result<Json<SubscriberHal>, HandlerError> {
     let mut transaction = state.db_pool.begin().await?;
     let branch_id = get_or_insert_branch_id(&mut transaction, &payload).await?;
     let subscriber = sqlx::query_as::<_, Subscriber>(
@@ -29,30 +50,30 @@ pub async fn create_subscriber(
 
     info!("Registered new subscriber for branch ID {branch_id}: {subscriber:?}");
 
-    Ok(Json(subscriber))
+    Ok(Json(map_to_hal(subscriber)))
 }
 
 /// Retrieves all [`Subscriber`]s.
 pub async fn list_subscribers(
     State(state): State<AppState>,
-) -> Result<Json<Vec<Subscriber>>, HandlerError> {
+) -> Result<Json<Vec<SubscriberHal>>, HandlerError> {
     let subscribers = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers")
         .fetch_all(&state.db_pool)
         .await?;
-    Ok(Json(subscribers))
+    Ok(Json(subscribers.into_iter().map(map_to_hal).collect()))
 }
 
 /// Retrieves a specific [`Subscriber`] by ID.
 pub async fn get_subscriber(
     State(state): State<AppState>,
     Path(id): Path<i64>,
-) -> Result<Json<Subscriber>, HandlerError> {
+) -> Result<Json<SubscriberHal>, HandlerError> {
     let subscriber = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers WHERE id = ?")
         .bind(id)
         .fetch_optional(&state.db_pool)
         .await?
         .ok_or(HandlerError::NotFound)?;
-    Ok(Json(subscriber))
+    Ok(Json(map_to_hal(subscriber)))
 }
 
 /// Updates an existing [`Subscriber`].
@@ -60,7 +81,7 @@ pub async fn update_subscriber(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(payload): Json<UpdateSubscriber>,
-) -> Result<Json<Subscriber>, HandlerError> {
+) -> Result<Json<SubscriberHal>, HandlerError> {
     let mut query_builder = sqlx::QueryBuilder::new("UPDATE subscribers SET ");
     let mut separated = query_builder.separated(", ");
 
@@ -92,7 +113,7 @@ pub async fn update_subscriber(
         .await?
         .ok_or(HandlerError::NotFound)?;
 
-    Ok(Json(subscriber))
+    Ok(Json(map_to_hal(subscriber)))
 }
 
 /// Deletes a [`Subscriber`] by ID.
@@ -172,17 +193,20 @@ mod tests {
         let res = create_subscriber(State(state.clone()), Json(payload))
             .await
             .unwrap();
-        let id = res.id;
+        let id = res.subscriber.id;
+        assert_eq!(res.links.self_link.href, format!("/subscribers/{}", id));
 
         // List
         let list = list_subscribers(State(state.clone())).await.unwrap();
         assert_eq!(list.len(), 1);
+        assert_eq!(list[0].links.self_link.href, format!("/subscribers/{}", id));
 
         // Get
         let get = get_subscriber(State(state.clone()), Path(id))
             .await
             .unwrap();
-        assert_eq!(get.id, id);
+        assert_eq!(get.subscriber.id, id);
+        assert_eq!(get.links.self_link.href, format!("/subscribers/{}", id));
 
         // Update
         let update_payload = UpdateSubscriber {
@@ -193,7 +217,11 @@ mod tests {
         let updated = update_subscriber(State(state.clone()), Path(id), Json(update_payload))
             .await
             .unwrap();
-        assert_eq!(updated.target_repo, "https://github.com/org/new-target");
+        assert_eq!(
+            updated.subscriber.target_repo,
+            "https://github.com/org/new-target"
+        );
+        assert_eq!(updated.links.self_link.href, format!("/subscribers/{}", id));
 
         // Delete
         delete_subscriber(State(state.clone()), Path(id))
