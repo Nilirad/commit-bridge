@@ -45,6 +45,8 @@ mod polling;
 mod state;
 #[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+mod tests;
 mod trigger;
 
 #[tokio::main]
@@ -129,17 +131,13 @@ async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
 }
 
 /// Builds the application router.
-fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
+pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
     let state = AppState { db_pool: pool };
 
     let subscribers = Router::new()
         .route("/", post(create_subscriber).get(list_subscribers))
         .route(
-            "/subscribers",
-            post(create_subscriber).get(list_subscribers),
-        )
-        .route(
-            "/subscribers/{id}",
+            "/{id}",
             get(get_subscriber)
                 .patch(update_subscriber)
                 .delete(delete_subscriber),
