@@ -125,7 +125,7 @@ fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
             post(create_subscriber).get(list_subscribers),
         )
         .route(
-            "/subscribers/:id",
+            "/subscribers/{id}",
             get(get_subscriber)
                 .put(update_subscriber)
                 .delete(delete_subscriber),

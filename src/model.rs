@@ -63,6 +63,36 @@ pub struct Subscriber {
     pub updated_at: String,
 }
 
+/// HAL link structure.
+#[derive(Serialize)]
+pub struct HalLink {
+    /// URL of the link.
+    pub href: String,
+}
+
+/// HAL links for a subscriber.
+#[derive(Serialize)]
+pub struct SubscriberLinks {
+    /// Self link.
+    #[serde(rename = "self")]
+    pub self_link: HalLink,
+    /// Update link.
+    pub update: HalLink,
+    /// Delete link.
+    pub delete: HalLink,
+}
+
+/// HAL representation of a subscriber.
+#[derive(Serialize)]
+pub struct SubscriberHal {
+    /// The subscriber data.
+    #[serde(flatten)]
+    pub subscriber: Subscriber,
+    /// HAL links.
+    #[serde(rename = "_links")]
+    pub links: SubscriberLinks,
+}
+
 /// Holds payload data for the creation of a [`Subscriber`].
 #[derive(Debug, Deserialize)]
 pub struct CreateSubscriber {
