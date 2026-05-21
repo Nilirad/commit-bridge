@@ -14,7 +14,7 @@ use axum::{
     Router,
     http::{HeaderValue, Request, Response, header},
     middleware::{self, Next},
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post},
 };
 use reqwest::{Client, StatusCode};
 use tokio_util::sync::CancellationToken;
@@ -141,7 +141,7 @@ fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
         .route(
             "/subscribers/{id}",
             get(get_subscriber)
-                .put(update_subscriber)
+                .patch(update_subscriber)
                 .delete(delete_subscriber),
         )
         .layer(middleware::from_fn(set_no_cache_header));
