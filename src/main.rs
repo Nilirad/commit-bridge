@@ -8,15 +8,17 @@
     clippy::indexing_slicing
 )]
 
-use axum::body::Body;
-#[allow(unused_imports)]
 use axum::{
     Router,
-    http::{HeaderValue, Request, Response, header},
+    body::Body,
+    extract::State,
+    http::{HeaderValue, Request, Response, StatusCode, header},
     middleware::{self, Next},
-    routing::{delete, get, patch, post},
 };
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
+use rovo::Router as RovoRouter;
+use rovo::aide::openapi::OpenApi;
+use rovo::rovo;
 use tokio_util::sync::CancellationToken;
 use tower_http::timeout::TimeoutLayer;
 use tracing::error;
@@ -122,32 +124,55 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
 
 /// Middleware to set Cache-Control header.
 async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
+    let path = req.uri().path().to_string();
     let mut response = next.run(req).await;
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("private, no-cache, no-store, must-revalidate, max-age=0"),
-    );
+    if path.starts_with("/subscribers") {
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("private, no-cache, no-store, must-revalidate, max-age=0"),
+        );
+    }
     response
+}
+
+#[allow(missing_docs, clippy::missing_docs_in_private_items)]
+mod health_handler {
+    use super::*;
+    #[rovo]
+    pub async fn health_check(State(_state): State<AppState>) -> &'static str {
+        "Relay Server is alive"
+    }
 }
 
 /// Builds the application router.
 pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
     let state = AppState { db_pool: pool };
 
-    let subscribers = Router::new()
-        .route("/", post(create_subscriber).get(list_subscribers))
+    let mut api = OpenApi::default();
+    api.info.title = "Relay API".to_string();
+    api.info.description =
+        Some("API for managing repository subscribers and triggering workflows".to_string());
+
+    let subscribers = RovoRouter::<AppState>::new()
+        .route(
+            "/",
+            rovo::routing::post(create_subscriber).get(list_subscribers),
+        )
         .route(
             "/{id}",
-            get(get_subscriber)
+            rovo::routing::get(get_subscriber)
                 .patch(update_subscriber)
                 .delete(delete_subscriber),
-        )
-        .layer(middleware::from_fn(set_no_cache_header));
+        );
 
-    Router::new()
-        .route("/health", get(|| async { "Relay Server is alive" }))
+    RovoRouter::<AppState>::new()
+        .route("/health", rovo::routing::get(health_handler::health_check))
         .nest("/subscribers", subscribers)
+        .with_oas(api)
+        .with_scalar("/scalar")
         .with_state(state)
+        .finish()
+        .layer(middleware::from_fn(set_no_cache_header))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             config.server.in_request_timeout,

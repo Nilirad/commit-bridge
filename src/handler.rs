@@ -9,6 +9,7 @@ use axum::{
     Json,
     extract::{Path, State},
 };
+use rovo::rovo;
 use tracing::info;
 
 /// Maps a [`Subscriber`] to its HAL representation.
@@ -31,7 +32,16 @@ fn map_to_hal(subscriber: Subscriber) -> SubscriberHal {
 }
 
 /// Stores a new [`Subscriber`] in the database.
+#[rovo]
 pub async fn create_subscriber(
+    state: State<AppState>,
+    payload: Json<CreateSubscriber>,
+) -> Result<Json<SubscriberHal>, HandlerError> {
+    create_subscriber_inner(state, payload).await
+}
+
+/// Internal implementation of [`create_subscriber`].
+async fn create_subscriber_inner(
     State(state): State<AppState>,
     Json(payload): Json<CreateSubscriber>,
 ) -> Result<Json<SubscriberHal>, HandlerError> {
@@ -54,7 +64,15 @@ pub async fn create_subscriber(
 }
 
 /// Retrieves all [`Subscriber`]s.
+#[rovo]
 pub async fn list_subscribers(
+    state: State<AppState>,
+) -> Result<Json<Vec<SubscriberHal>>, HandlerError> {
+    list_subscribers_inner(state).await
+}
+
+/// Internal implementation of [`list_subscribers`].
+async fn list_subscribers_inner(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<SubscriberHal>>, HandlerError> {
     let subscribers = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers")
@@ -64,7 +82,16 @@ pub async fn list_subscribers(
 }
 
 /// Retrieves a specific [`Subscriber`] by ID.
+#[rovo]
 pub async fn get_subscriber(
+    state: State<AppState>,
+    id: Path<i64>,
+) -> Result<Json<SubscriberHal>, HandlerError> {
+    get_subscriber_inner(state, id).await
+}
+
+/// Internal implementation of [`get_subscriber`].
+async fn get_subscriber_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<SubscriberHal>, HandlerError> {
@@ -77,7 +104,17 @@ pub async fn get_subscriber(
 }
 
 /// Updates an existing [`Subscriber`].
+#[rovo]
 pub async fn update_subscriber(
+    state: State<AppState>,
+    id: Path<i64>,
+    payload: Json<UpdateSubscriber>,
+) -> Result<Json<SubscriberHal>, HandlerError> {
+    update_subscriber_inner(state, id, payload).await
+}
+
+/// Internal implementation of [`update_subscriber`].
+async fn update_subscriber_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(payload): Json<UpdateSubscriber>,
@@ -117,7 +154,13 @@ pub async fn update_subscriber(
 }
 
 /// Deletes a [`Subscriber`] by ID.
-pub async fn delete_subscriber(
+#[rovo]
+pub async fn delete_subscriber(state: State<AppState>, id: Path<i64>) -> Result<(), HandlerError> {
+    delete_subscriber_inner(state, id).await
+}
+
+/// Internal implementation of [`delete_subscriber`].
+async fn delete_subscriber_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<(), HandlerError> {
@@ -190,19 +233,19 @@ mod tests {
         };
 
         // Create
-        let res = create_subscriber(State(state.clone()), Json(payload))
+        let res = create_subscriber_inner(State(state.clone()), Json(payload))
             .await
             .unwrap();
         let id = res.subscriber.id;
         assert_eq!(res.links.self_link.href, format!("/subscribers/{}", id));
 
         // List
-        let list = list_subscribers(State(state.clone())).await.unwrap();
+        let list = list_subscribers_inner(State(state.clone())).await.unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].links.self_link.href, format!("/subscribers/{}", id));
 
         // Get
-        let get = get_subscriber(State(state.clone()), Path(id))
+        let get = get_subscriber_inner(State(state.clone()), Path(id))
             .await
             .unwrap();
         assert_eq!(get.subscriber.id, id);
@@ -214,7 +257,7 @@ mod tests {
             event_type: None,
             gh_app_installation_id: None,
         };
-        let updated = update_subscriber(State(state.clone()), Path(id), Json(update_payload))
+        let updated = update_subscriber_inner(State(state.clone()), Path(id), Json(update_payload))
             .await
             .unwrap();
         assert_eq!(
@@ -224,12 +267,12 @@ mod tests {
         assert_eq!(updated.links.self_link.href, format!("/subscribers/{}", id));
 
         // Delete
-        delete_subscriber(State(state.clone()), Path(id))
+        delete_subscriber_inner(State(state.clone()), Path(id))
             .await
             .unwrap();
 
         // Verify delete
-        let get_after_delete = get_subscriber(State(state.clone()), Path(id)).await;
+        let get_after_delete = get_subscriber_inner(State(state.clone()), Path(id)).await;
         assert!(get_after_delete.is_err());
     }
 }

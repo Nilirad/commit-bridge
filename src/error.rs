@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use rovo::aide::OperationOutput;
 use thiserror::Error;
 
 /// An error happened inside an Axum handler.
@@ -16,6 +17,10 @@ pub enum HandlerError {
     /// Requested resource not found.
     #[error("Not Found")]
     NotFound,
+}
+
+impl OperationOutput for HandlerError {
+    type Inner = ();
 }
 
 impl IntoResponse for HandlerError {
