@@ -20,6 +20,7 @@ tracing = "0.1.44"
 tracing-subscriber = "0.3"
 validator = { version = "0.20.0", features = ["derive"] }
 tower = { version = "0.5.3", features = ["util"] }
+rovo = { version = "0.4.8", features = ["scalar"] }
 
 [dev-dependencies]
 wiremock = "0.6"

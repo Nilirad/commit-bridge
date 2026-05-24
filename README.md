@@ -81,6 +81,11 @@ curl -X POST http://localhost:3000/subscribers \
 Make sure that `EVENT_TYPE` is the same
 as the one defined in the workflow.
 
+<!-- Scalar UI -->
+You can also access the API documentation and testing interface
+via the Scalar UI by navigating to `/scalar` on your server
+(e.g., http://localhost:3000/scalar).
+
 <!-- Wait for changes -->
 At this point,
 the server is ready to listen to the source repository

@@ -3,11 +3,12 @@
 //! The `Create_` `struct`s represent the payload
 //! to create the corresponding row.
 
+use rovo::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// Represents a row in the `branches` table.
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema)]
 pub struct Branch {
     /// Unique database primary key.
     pub id: i64,
@@ -31,7 +32,7 @@ pub struct Branch {
 }
 
 /// Represents a row in the `subscribers` table.
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema)]
 pub struct Subscriber {
     /// Unique database primary key.
     pub id: i64,
@@ -64,14 +65,14 @@ pub struct Subscriber {
 }
 
 /// HAL link structure.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub struct HalLink {
     /// URL of the link.
     pub href: String,
 }
 
 /// HAL links for a subscriber.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub struct SubscriberLinks {
     /// Self link.
     #[serde(rename = "self")]
@@ -83,7 +84,7 @@ pub struct SubscriberLinks {
 }
 
 /// HAL representation of a subscriber.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub struct SubscriberHal {
     /// The subscriber data.
     #[serde(flatten)]
@@ -94,7 +95,7 @@ pub struct SubscriberHal {
 }
 
 /// Holds payload data for the creation of a [`Subscriber`].
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct CreateSubscriber {
     /// Determines the value of [`Branch::repo_url`].
     pub source_repo_url: String,
@@ -113,7 +114,7 @@ pub struct CreateSubscriber {
 }
 
 /// Holds payload data for the update of a [`Subscriber`].
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateSubscriber {
     /// Determines the value of [`Subscriber::target_repo`].
     pub target_repo: Option<String>,
