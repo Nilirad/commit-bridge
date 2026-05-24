@@ -220,7 +220,10 @@ async fn update_subscriber_inner(
 ///
 /// @tag subscribers
 #[rovo]
-pub async fn delete_subscriber(state: State<AppState>, Path(id): Path<i64>) -> Result<(), HandlerError> {
+pub async fn delete_subscriber(
+    state: State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<(), HandlerError> {
     delete_subscriber_inner(state, Path(id)).await
 }
 
