@@ -189,6 +189,7 @@ async fn run_server(
         .await
         .map_err(FatalError::TcpBinding)?;
     println!("Server listening on http://{}", config.server.address);
+    println!("Scalar UI available at http://{}/scalar", config.server.address);
     axum::serve(listener, app)
         .await
         .map_err(FatalError::Serve)?;
