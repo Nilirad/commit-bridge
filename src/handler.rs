@@ -42,6 +42,7 @@ fn map_to_hal(subscriber: Subscriber) -> SubscriberHal {
 /// # Metadata
 ///
 /// @tag subscribers
+#[allow(rustdoc::invalid_html_tags)]
 #[rovo]
 pub async fn create_subscriber(
     state: State<AppState>,
@@ -84,6 +85,7 @@ async fn create_subscriber_inner(
 /// # Metadata
 ///
 /// @tag subscribers
+#[allow(rustdoc::invalid_html_tags)]
 #[rovo]
 pub async fn list_subscribers(
     state: State<AppState>,
@@ -117,6 +119,7 @@ async fn list_subscribers_inner(
 /// # Metadata
 ///
 /// @tag subscribers
+#[allow(rustdoc::invalid_html_tags)]
 #[rovo]
 pub async fn get_subscriber(
     state: State<AppState>,
@@ -154,6 +157,7 @@ async fn get_subscriber_inner(
 /// # Metadata
 ///
 /// @tag subscribers
+#[allow(rustdoc::invalid_html_tags)]
 #[rovo]
 pub async fn update_subscriber(
     state: State<AppState>,
@@ -219,6 +223,7 @@ async fn update_subscriber_inner(
 /// # Metadata
 ///
 /// @tag subscribers
+#[allow(rustdoc::invalid_html_tags)]
 #[rovo]
 pub async fn delete_subscriber(
     state: State<AppState>,
