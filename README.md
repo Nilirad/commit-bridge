@@ -1,6 +1,5 @@
 # Relay Server
 
-<!-- Problem Statement -->
 Triggering a repository workflow
 in response to a commit on a different repository
 is not a trivial problem.
@@ -10,7 +9,6 @@ Triggering a CI workflow
 when a git dependency gets updated
 is important for detecting breaking changes as soon as possible.
 
-<!-- Solution Presentation -->
 This project attempts to solve this problem
 by providing a server that acts as an intermediary
 between the repositories containing the dependencies
@@ -21,7 +19,7 @@ This project uses
 [`git ls-remote`] to check the last commit on a remote branch,
 and [`sqlx`] connected to a SQLite database to hold state.
 
-<!-- Links -->
+<!-- LINKS -->
 [`axum`]: https://docs.rs/axum/latest/axum/
 [`reqwest`]: https://docs.rs/reqwest/latest/reqwest/
 [`git ls-remote`]: https://git-scm.com/docs/git-ls-remote
@@ -29,13 +27,16 @@ and [`sqlx`] connected to a SQLite database to hold state.
 
 ## Usage
 
-<!-- GitHub App Setup -->
+**Setup GitHub App.**
 To authorize the server to trigger a workflow in your repository,
 set up and install a GitHub App
 with `Contents` set to `Read and write` permissions.
+Then,
+annotate your client id
+and download your private PEM key.
 
 
-<!-- Workflow Setup -->
+**Setup workflow on target repository.**
 Set up your GitHub Actions workflow
 to be triggered by a `repository_dispatch` event:
 
@@ -49,22 +50,29 @@ on:
 It is used to distinguish the event
 from other `repository_dispatch` events.
 
-<!-- Running Server -->
+**Run the server.**
 Clone this repository:
 
 ```shell
 git clone https://github.com/Nilirad/relay.git
 ```
 
-Configure the environment according to the section below,
-then run the server:
+Follow the instructions in the **"Setup"** section,
+then run the server
+(unless you already deployed a container):
 
 ```shell
 cargo run --release
 ```
 
-<!-- Populate Database -->
-Populate the database with the subscriptions you need:
+**Populate the database.**
+Populate the database with the subscriptions you need.
+Usage of the Scalar UI,
+accessible by navigating to `/scalar` on your server
+(e.g., http://localhost:3000/scalar),
+is preferred.
+The `curl` command below is left as an example
+on how to subscribe to a branch.
 
 ```shell
 curl -X POST http://localhost:3000/subscribers \
@@ -81,42 +89,70 @@ curl -X POST http://localhost:3000/subscribers \
 Make sure that `EVENT_TYPE` is the same
 as the one defined in the workflow.
 
-<!-- Scalar UI -->
-You can also access the API documentation and testing interface
-via the Scalar UI by navigating to `/scalar` on your server
-(e.g., http://localhost:3000/scalar).
-
-<!-- Wait for changes -->
+**Wait for changes.**
 At this point,
 the server is ready to listen to the source repository
 and trigger your workflow shortly after a new commit is pushed
 (about 5 minutes or less).
 
-## Environment Configuration
+## Setup
 
-[`Nix`] is recommended to set up the development environment.
-If you decide to use it,
-just run `nix develop`
+First,
+create your `.env` file by copying the example:
+
+```shell
+cp .env.example .env
+```
+
+Then,
+edit the `.env` file to add your GitHub App's client id (`GH_CLIENT_ID`)
+and prepare the necessary paths for your GitHub App private key.
+
+### Docker deployment
+
+For containerized deployment,
+use the provided `docker-compose.yaml.example`:
+
+```shell
+cp docker-compose.yaml.example docker-compose.yaml
+```
+
+Ensure the path to your GitHub App private key
+is correctly mapped in `docker-compose.yaml`,
+then build and start the container:
+
+```shell
+docker-compose up -d
+```
+
+### Nix flake
+
+[`Nix`] is recommended
+to set up the development environment.
+
+Just run `nix develop`
 to enter a shell with the required environment.
-If you use [`nix-direnv`],
-you can automatically enter the shell just by entering the workspace directory.
-In any case, ensure [flakes are enabled]
-and that you have set the `GH_CLIENT_ID` and the `GH_APP_KEY_PATH`
-environment variables (see below).
 
-If you prefer not to use Nix,
-you can still build and run this server by manually configuring the environment:
+If you use [`nix-direnv`],
+you can automatically enter the shell
+just by entering the workspace directory.
+
+Ensure [flakes are enabled]
+and that you have set the `GH_CLIENT_ID`
+and the `GH_APP_KEY_PATH` environment variables.
+
+### Manual setup
+
+If you prefer not to use Nix or a container,
+you can build and run this server
+by manually configuring the environment:
 
 - Install [Rust]
   (build-time dependency).
 - Install `git`
   (runtime dependency).
-- Set up the `GH_CLIENT_ID` environment variable
-  with the Client ID of the GitHub App.
-- Set up the `GH_APP_KEY_PATH` environment variable
-  with the path to the `.pem` key.
 
-<!-- Links -->
+<!-- LINKS -->
 [`Nix`]: https://nixos.org/learn/
 [`nix-direnv`]: https://github.com/nix-community/nix-direnv
 [flakes are enabled]: https://nixos.wiki/wiki/Flakes
