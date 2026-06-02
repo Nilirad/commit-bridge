@@ -1,4 +1,4 @@
-use crate::{build_router, config::Config, test_utils::create_test_db};
+use crate::{build_router, test_utils::create_test_db};
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -8,7 +8,7 @@ use tower::ServiceExt; // for oneshot
 #[tokio::test]
 async fn test_subscriber_api_routes() {
     let pool = create_test_db().await;
-    let config = Config::default();
+    let config = crate::test_utils::create_test_config();
 
     let app = build_router(pool, &config);
 

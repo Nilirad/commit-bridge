@@ -118,7 +118,7 @@ mod tests {
         });
 
         let ctx = SharedContext {
-            config: crate::config::Config::default(),
+            config: crate::test_utils::create_test_config(),
             db_pool: pool.clone(),
             git_fetcher: mock_fetcher,
             token: CancellationToken::new(),

@@ -278,7 +278,6 @@ mod tests {
     )]
 
     use super::*;
-    use crate::config::Config;
     use crate::test_utils::{MockAuthenticator, MockGitFetcher};
     use std::sync::Arc;
 
@@ -301,7 +300,7 @@ mod tests {
         sqlx::query!("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now'))",
             1, "hash", "PENDING", 0).execute(&pool).await.unwrap();
 
-        recover_stuck_tasks(&pool, &Config::default())
+        recover_stuck_tasks(&pool, &crate::test_utils::create_test_config())
             .await
             .unwrap();
 
@@ -356,7 +355,7 @@ mod tests {
 
         let engine = TriggerEngine {
             ctx: SharedContext {
-                config: Config::default(),
+                config: crate::test_utils::create_test_config(),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 git_fetcher: Arc::new(MockGitFetcher {
@@ -428,7 +427,7 @@ mod tests {
 
         let engine = TriggerEngine {
             ctx: SharedContext {
-                config: Config::default(),
+                config: crate::test_utils::create_test_config(),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 git_fetcher: Arc::new(MockGitFetcher {

@@ -4,27 +4,30 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = { version = "0.8.8", features = ["macros"] }
 async-trait = "0.1"
+axum = { version = "0.8.8", features = ["macros"] }
+config = "0.15.23"
+dotenvy = "0.15.7"
 futures = "0.3.32"
+humantime-serde = "1.1.1"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 reqwest = { version = "0.13.2", features = ["json"] }
+rovo = { version = "0.4.8", features = ["scalar"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio-rustls", "macros" ] }
 thiserror = "2.0.18"
 tokio = { version = "1.51.1", features = ["process", "rt-multi-thread"] }
 tokio-util = "0.7.18"
+tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.6", features = ["timeout"] }
 tracing = "0.1.44"
 tracing-subscriber = "0.3"
 validator = { version = "0.20.0", features = ["derive"] }
-tower = { version = "0.5.3", features = ["util"] }
-rovo = { version = "0.4.8", features = ["scalar"] }
 
 [dev-dependencies]
-wiremock = "0.6"
 tokio-test = "0.4"
+wiremock = "0.6"
 
 [profile.release]
 lto = true

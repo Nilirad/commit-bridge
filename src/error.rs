@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use config::ConfigError;
 use rovo::aide::OperationOutput;
 use thiserror::Error;
 
@@ -40,6 +41,10 @@ pub enum FatalError {
     #[error("Database connection: {0}")]
     DbConnection(#[from] sqlx::Error),
 
+    /// Error in database migration.
+    #[error("Database migration: {0}")]
+    Migration(#[from] sqlx::migrate::MigrateError),
+
     /// Could not reserve an IP address with a TCP port
     /// to connect to the server.
     #[error("TCP binding: {0}")]
@@ -57,6 +62,34 @@ pub enum FatalError {
     /// Environment variable not set.
     #[error("Environment variable '{0}' not set")]
     EnvVarNotSet(String),
+
+    /// Configuration is invalid.
+    #[error(transparent)]
+    Setup(SetupError),
+}
+
+/// Error about the setup configuration.
+#[derive(Debug, Error)]
+pub enum SetupError {
+    /// Configuration is incomplete.
+    #[error("Configuration error: {0}")]
+    Config(#[source] ConfigError),
+
+    /// Error in retrieving configuration from the environment.
+    #[error("Failed to load configuration: {0}")]
+    Env(#[source] dotenvy::Error),
+}
+
+impl From<config::ConfigError> for FatalError {
+    fn from(e: config::ConfigError) -> Self {
+        FatalError::Setup(SetupError::Config(e))
+    }
+}
+
+impl From<dotenvy::Error> for FatalError {
+    fn from(e: dotenvy::Error) -> Self {
+        FatalError::Setup(SetupError::Env(e))
+    }
 }
 
 /// HTTP Client creation failed.

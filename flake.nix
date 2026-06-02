@@ -106,6 +106,17 @@
               export DATABASE_URL="sqlite://relay.db?mode=rwc"
             '';
           };
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "relay";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.openssl ];
+          SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        };
       };
     };
 }

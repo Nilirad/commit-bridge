@@ -55,3 +55,36 @@ pub async fn create_test_db() -> SqlitePool {
 
     pool
 }
+
+pub fn create_test_config() -> crate::config::Config {
+    crate::config::Config {
+        server: crate::config::ServerConfig {
+            address: "127.0.0.1:0".to_string(),
+            user_agent: "test-agent".to_string(),
+            in_request_timeout: std::time::Duration::from_secs(1),
+            out_request_timeout: std::time::Duration::from_secs(1),
+        },
+        database: crate::config::DatabaseConfig {
+            url: "sqlite::memory:".to_string(),
+            timeout: std::time::Duration::from_secs(1),
+            polling_db_buffer_size: 1,
+            polling_db_error_cooldown: std::time::Duration::from_secs(1),
+        },
+        github_api: crate::config::GitHubApiConfig {
+            base_url: "http://localhost".to_string(),
+            version: "2026-03-10".to_string(),
+            accept_header: "application/vnd.github+json".to_string(),
+        },
+        engine: crate::config::EngineConfig {
+            polling_sleep: std::time::Duration::from_secs(1),
+            trigger_queue_polling_interval: std::time::Duration::from_millis(100),
+            trigger_retry_max_attempts: 3,
+            trigger_retry_backoff_base: std::time::Duration::from_millis(100),
+            stuck_task_threshold: std::time::Duration::from_secs(2 * 60),
+        },
+        auth: crate::config::AuthConfig {
+            clock_drift_buffer: std::time::Duration::from_secs(1),
+            token_validity: std::time::Duration::from_secs(1),
+        },
+    }
+}
