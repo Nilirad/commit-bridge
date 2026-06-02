@@ -41,6 +41,10 @@ pub enum FatalError {
     #[error("Database connection: {0}")]
     DbConnection(#[from] sqlx::Error),
 
+    /// Error in database migration.
+    #[error("Database migration: {0}")]
+    Migration(#[from] sqlx::migrate::MigrateError),
+
     /// Could not reserve an IP address with a TCP port
     /// to connect to the server.
     #[error("TCP binding: {0}")]

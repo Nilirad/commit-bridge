@@ -1,0 +1,18 @@
+services:
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nilirad/relay:latest
+    container_name: relay-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - relay_data:/app/data
+      - ./YOUR_PEM_FILE.pem:/app/data/YOUR_PEM_FILE.pem:ro
+    env_file:
+      - .env
+
+volumes:
+  relay_data:

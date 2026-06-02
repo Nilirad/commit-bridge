@@ -13,3 +13,4 @@
 # Secrets
 *.pem
 .env
+/docker-compose.yaml

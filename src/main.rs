@@ -92,6 +92,9 @@ async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> 
         .acquire_timeout(config.database.timeout)
         .connect(&config.database.url)
         .await?;
+
+    sqlx::migrate!().run(&pool).await?;
+
     Ok(pool)
 }
 
