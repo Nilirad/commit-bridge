@@ -62,8 +62,13 @@ type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 /// Runs the server, delegating errors to the caller.
 async fn run_app() -> Result<(), FatalError> {
     tracing_subscriber::fmt::init();
+    #[cfg(debug_assertions)]
+    {
+        dotenvy::dotenv()?;
+        tracing::info!("Successfully loaded local .env file.");
+    }
 
-    let config = Config::default();
+    let config = Config::load()?;
     let pool = init_database(&config).await?;
     let http_client = build_http_client(&config)?;
 
