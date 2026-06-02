@@ -107,6 +107,8 @@ cp .env.example .env
 Then,
 edit the `.env` file to add your GitHub App's client id (`GH_CLIENT_ID`)
 and prepare the necessary paths for your GitHub App private key.
+Finally,
+follow one of the three options below.
 
 ### Docker deployment
 
@@ -130,16 +132,12 @@ docker-compose up -d
 [`Nix`] is recommended
 to set up the development environment.
 
+Ensure [flakes are enabled].
 Just run `nix develop`
 to enter a shell with the required environment.
-
 If you use [`nix-direnv`],
 you can automatically enter the shell
 just by entering the workspace directory.
-
-Ensure [flakes are enabled]
-and that you have set the `GH_CLIENT_ID`
-and the `GH_APP_KEY_PATH` environment variables.
 
 ### Manual setup
 
