@@ -130,6 +130,28 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
     ])
 }
 
+/// Middleware to authorize requests with an API key.
+async fn auth_middleware(
+    State(state): State<AppState>,
+    req: Request<Body>,
+    next: Next,
+) -> Response<Body> {
+    if req.uri().path().starts_with("/subscribers")
+        && let Some(api_key) = &state.api_key
+    {
+        let auth_header = req.headers().get("X-API-KEY").and_then(|v| v.to_str().ok());
+
+        if auth_header != Some(api_key) {
+            return Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(Body::empty())
+                .unwrap();
+        }
+    }
+
+    next.run(req).await
+}
+
 /// Middleware to set Cache-Control header.
 async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
     let path = req.uri().path().to_string();
@@ -154,7 +176,10 @@ mod health_handler {
 
 /// Builds the application router.
 pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
-    let state = AppState { db_pool: pool };
+    let state = AppState {
+        db_pool: pool,
+        api_key: config.auth.api_key.clone(),
+    };
 
     let mut api = OpenApi::default();
     api.info.title = "Relay API".to_string();
@@ -178,9 +203,10 @@ pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
         .nest("/subscribers", subscribers)
         .with_oas(api)
         .with_scalar("/scalar")
-        .with_state(state)
+        .with_state(state.clone())
         .finish()
         .layer(middleware::from_fn(set_no_cache_header))
+        .layer(middleware::from_fn_with_state(state, auth_middleware))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             config.server.in_request_timeout,

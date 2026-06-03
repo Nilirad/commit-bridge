@@ -296,6 +296,7 @@ mod tests {
         let pool = create_test_db().await;
         let state = AppState {
             db_pool: pool.clone(),
+            api_key: None,
         };
         let payload = CreateSubscriber {
             source_repo_url: "https://github.com/org/repo".to_string(),

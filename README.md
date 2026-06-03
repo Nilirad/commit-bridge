@@ -156,6 +156,20 @@ by manually configuring the environment:
 [flakes are enabled]: https://nixos.wiki/wiki/Flakes
 [Rust]: https://rust-lang.org/learn/get-started/
 
+## Security
+
+You can secure the API by requiring an API key for all sensible endpoint interactions.
+
+1.  **Configure:** In your `.env` file, set the `RELAY__AUTH__API_KEY` environment variable to a secure value.
+2.  **Authenticate:** When making requests to `/subscribers` (via `curl` or other tools), include the key in the header:
+
+    ```shell
+    curl -X GET http://localhost:3000/subscribers \
+      -H "X-API-KEY: YOUR_API_KEY"
+    ```
+
+If `RELAY__AUTH__API_KEY` is not set in your environment, authentication is disabled, allowing unrestricted access to these endpoints.
+
 ## License
 
 This repository is dual-licensed under the following,

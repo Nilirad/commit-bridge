@@ -121,4 +121,10 @@ pub struct AuthConfig {
     /// Duration for which an authentication token is valid.
     #[serde(with = "humantime_serde")]
     pub token_validity: Duration,
+
+    /// Optional API key for authentication.
+    ///
+    /// If set, the `X-API-KEY` header must be present
+    /// and match this value on sensible requests.
+    pub api_key: Option<String>,
 }
