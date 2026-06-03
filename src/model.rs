@@ -3,6 +3,7 @@
 //! The `Create_` `struct`s represent the payload
 //! to create the corresponding row.
 
+use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
 use rovo::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -14,10 +15,10 @@ pub struct Branch {
     pub id: i64,
 
     /// Full HTTPS URL of the monitored git repository.
-    pub repo_url: String,
+    pub repo_url: RepoUrl,
 
     /// Name of the git branch to poll.
-    pub name: String,
+    pub name: BranchName,
 
     /// SHA of the latest commit polled.
     ///
@@ -41,7 +42,7 @@ pub struct Subscriber {
     pub branch_id: i64,
 
     /// The repository whose workflow needs to be triggered.
-    pub target_repo: String,
+    pub target_repo: TargetRepo,
 
     /// Identifies the specific [`repository_dispatch`] event.
     ///
@@ -98,16 +99,16 @@ pub struct SubscriberHal {
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct CreateSubscriber {
     /// Determines the value of [`Branch::repo_url`].
-    pub source_repo_url: String,
+    pub source_repo_url: RepoUrl,
 
     /// Determines the value of [`Branch::name`].
-    pub source_branch_name: String,
+    pub source_branch_name: BranchName,
 
     /// Determines the value of [`Subscriber::target_repo`].
-    pub target_repo: String,
+    pub target_repo: TargetRepo,
 
     /// Determines the value of [`Subscriber::event_type`].
-    pub event_type: String,
+    pub event_type: EventType,
 
     /// Determines the value of [`Subscriber::gh_app_installation_id`].
     pub gh_app_installation_id: i64,
@@ -117,10 +118,10 @@ pub struct CreateSubscriber {
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateSubscriber {
     /// Determines the value of [`Subscriber::target_repo`].
-    pub target_repo: Option<String>,
+    pub target_repo: Option<TargetRepo>,
 
     /// Determines the value of [`Subscriber::event_type`].
-    pub event_type: Option<String>,
+    pub event_type: Option<EventType>,
 
     /// Determines the value of [`Subscriber::gh_app_installation_id`].
     pub gh_app_installation_id: Option<i64>,

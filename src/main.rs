@@ -39,6 +39,7 @@ use crate::{
 /// Server configuration module.
 mod config;
 mod context;
+mod domain;
 mod engine;
 mod error;
 mod handler;

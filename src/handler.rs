@@ -4,6 +4,7 @@ use crate::error::HandlerError;
 use crate::model::{
     CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, UpdateSubscriber,
 };
+
 use crate::state::AppState;
 use axum::{
     Json,
@@ -62,8 +63,8 @@ async fn create_subscriber_inner(
         "INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?) RETURNING *"
     )
     .bind(branch_id)
-    .bind(&payload.target_repo)
-    .bind(&payload.event_type)
+    .bind(payload.target_repo.clone().into_inner())
+    .bind(payload.event_type.clone().into_inner())
     .bind(payload.gh_app_installation_id)
     .fetch_one(&mut *transaction)
     .await?;
@@ -179,12 +180,12 @@ async fn update_subscriber_inner(
     if let Some(target_repo) = &payload.target_repo {
         separated
             .push("target_repo = ")
-            .push_bind_unseparated(target_repo);
+            .push_bind_unseparated(target_repo.clone().into_inner());
     }
     if let Some(event_type) = &payload.event_type {
         separated
             .push("event_type = ")
-            .push_bind_unseparated(event_type);
+            .push_bind_unseparated(event_type.clone().into_inner());
     }
     if let Some(gh_app_installation_id) = payload.gh_app_installation_id {
         separated
@@ -257,8 +258,8 @@ async fn get_or_insert_branch_id(
 ) -> Result<i64, HandlerError> {
     let branch_id_opt =
         sqlx::query_scalar::<_, i64>("SELECT id FROM branches WHERE repo_url = ? AND name = ?")
-            .bind(&payload.source_repo_url)
-            .bind(&payload.source_branch_name)
+            .bind(payload.source_repo_url.clone().into_inner())
+            .bind(payload.source_branch_name.clone().into_inner())
             .fetch_optional(&mut *transaction)
             .await?;
 
@@ -267,8 +268,8 @@ async fn get_or_insert_branch_id(
     }
 
     sqlx::query_scalar::<_, i64>("INSERT INTO branches (repo_url, name) VALUES (?, ?) RETURNING id")
-        .bind(&payload.source_repo_url)
-        .bind(&payload.source_branch_name)
+        .bind(payload.source_repo_url.clone().into_inner())
+        .bind(payload.source_branch_name.clone().into_inner())
         .fetch_one(&mut *transaction)
         .await
         .map_err(Into::into)
@@ -285,6 +286,7 @@ mod tests {
     )]
 
     use super::*;
+    use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
     use crate::model::CreateSubscriber;
     use crate::state::AppState;
     use crate::test_utils::create_test_db;
@@ -299,10 +301,10 @@ mod tests {
             api_key: None,
         };
         let payload = CreateSubscriber {
-            source_repo_url: "https://github.com/org/repo".to_string(),
-            source_branch_name: "main".to_string(),
-            target_repo: "https://github.com/org/target".to_string(),
-            event_type: "dispatch".to_string(),
+            source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),
+            source_branch_name: BranchName::new("main".to_string()).unwrap(),
+            target_repo: TargetRepo::new("org/target".to_string()).unwrap(),
+            event_type: EventType::new("dispatch".to_string()).unwrap(),
             gh_app_installation_id: 1,
         };
 
@@ -327,7 +329,7 @@ mod tests {
 
         // Update
         let update_payload = UpdateSubscriber {
-            target_repo: Some("https://github.com/org/new-target".to_string()),
+            target_repo: Some(TargetRepo::new("org/new-target".to_string()).unwrap()),
             event_type: None,
             gh_app_installation_id: None,
         };
@@ -336,8 +338,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             updated.subscriber.target_repo,
-            "https://github.com/org/new-target"
+            TargetRepo::new("org/new-target".to_string()).unwrap()
         );
+
         assert_eq!(updated.links.self_link.href, format!("/subscribers/{}", id));
 
         // Delete

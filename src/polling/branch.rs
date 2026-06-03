@@ -18,7 +18,10 @@ impl BranchInfo {
         fetcher: &F,
     ) -> Result<BranchInfo, CommitHashError> {
         let latest_hash = fetcher
-            .get_latest_hash(&branch.repo_url, &branch.name)
+            .get_latest_hash(
+                &branch.repo_url.clone().into_inner(),
+                &branch.name.clone().into_inner(),
+            )
             .await?;
         Ok(BranchInfo {
             branch,

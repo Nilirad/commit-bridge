@@ -8,6 +8,20 @@ use config::ConfigError;
 use rovo::aide::OperationOutput;
 use thiserror::Error;
 
+/// Validation error.
+#[derive(Debug, Error)]
+pub enum ValidationError {
+    /// Invalid field value.
+    #[error("Validation error: {0}")]
+    InvalidValue(String),
+}
+
+impl IntoResponse for ValidationError {
+    fn into_response(self) -> Response {
+        (StatusCode::UNPROCESSABLE_ENTITY, self.to_string()).into_response()
+    }
+}
+
 /// An error happened inside an Axum handler.
 #[derive(Debug, Error)]
 pub enum HandlerError {
