@@ -85,6 +85,7 @@ pub fn create_test_config() -> crate::config::Config {
         auth: crate::config::AuthConfig {
             clock_drift_buffer: std::time::Duration::from_secs(1),
             token_validity: std::time::Duration::from_secs(1),
+            api_key: None,
         },
     }
 }

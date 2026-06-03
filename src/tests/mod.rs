@@ -7,3 +7,4 @@
 )]
 
 pub mod api_routes;
+pub mod auth_tests;
