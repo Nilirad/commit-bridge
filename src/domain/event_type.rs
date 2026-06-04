@@ -27,28 +27,7 @@ impl EventType {
     }
 }
 
-// Add these to satisfy SQLx
-impl sqlx::Type<sqlx::Sqlite> for EventType {
-    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
-        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for EventType {
-    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        Ok(EventType(s))
-    }
-}
-
-impl sqlx::Encode<'_, sqlx::Sqlite> for EventType {
-    fn encode_by_ref(
-        &self,
-        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>,
-    ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
-        <String as sqlx::Encode<sqlx::Sqlite>>::encode_by_ref(&self.0, buf)
-    }
-}
+crate::derive_sqlx_traits!(EventType);
 
 impl std::fmt::Display for EventType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
