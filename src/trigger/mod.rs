@@ -244,10 +244,13 @@ async fn send_repository_dispatch(
         .http_client
         .post(&api_url)
         .bearer_auth(iat)
-        .header("Accept", &engine.ctx.config.github_api.accept_header)
+        .header(
+            "Accept",
+            engine.ctx.config.github_api.accept_header.to_string(),
+        )
         .header(
             "X-GitHub-Api-Version",
-            &engine.ctx.config.github_api.version,
+            engine.ctx.config.github_api.version.to_string(),
         )
         .json(&payload)
         .send()

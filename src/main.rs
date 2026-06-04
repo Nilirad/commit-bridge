@@ -91,7 +91,7 @@ async fn run_app() -> Result<(), FatalError> {
 async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> {
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .acquire_timeout(config.database.timeout)
-        .connect(&config.database.url)
+        .connect(config.database.url.as_str())
         .await?;
 
     sqlx::migrate!().run(&pool).await?;
@@ -219,7 +219,7 @@ async fn run_server(
     token: CancellationToken,
     config: &Config,
 ) -> Result<(), FatalError> {
-    let listener = tokio::net::TcpListener::bind(&config.server.address)
+    let listener = tokio::net::TcpListener::bind(config.server.address)
         .await
         .map_err(FatalError::TcpBinding)?;
     println!("Server listening on http://{}", config.server.address);
@@ -239,7 +239,7 @@ async fn run_server(
 /// Creates a new HTTP client.
 pub fn build_http_client(config: &Config) -> Result<Client, ClientCreationError> {
     let client = Client::builder()
-        .user_agent(&config.server.user_agent)
+        .user_agent(config.server.user_agent.to_string())
         .timeout(config.server.out_request_timeout)
         .build()?;
 

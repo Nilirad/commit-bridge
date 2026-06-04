@@ -1,5 +1,7 @@
 //! State of the application.
 
+use crate::domain::NonEmptyString;
+
 /// Holds data accessible from each [handler].
 ///
 /// <!-- LINKS -->
@@ -10,5 +12,5 @@ pub struct AppState {
     pub db_pool: sqlx::SqlitePool,
 
     /// Optional API key for authentication.
-    pub api_key: Option<String>,
+    pub api_key: Option<NonEmptyString>,
 }

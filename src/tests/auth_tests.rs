@@ -1,4 +1,4 @@
-use crate::{build_router, test_utils::create_test_db};
+use crate::{build_router, domain::NonEmptyString, test_utils::create_test_db};
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -31,7 +31,7 @@ async fn test_auth_no_key_configured() {
 async fn test_auth_key_configured_success() {
     let pool = create_test_db().await;
     let mut config = crate::test_utils::create_test_config();
-    config.auth.api_key = Some("secret".to_string());
+    config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
     let app = build_router(pool, &config);
 
@@ -54,7 +54,7 @@ async fn test_auth_key_configured_success() {
 async fn test_auth_key_configured_mismatch() {
     let pool = create_test_db().await;
     let mut config = crate::test_utils::create_test_config();
-    config.auth.api_key = Some("secret".to_string());
+    config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
     let app = build_router(pool, &config);
 
@@ -77,7 +77,7 @@ async fn test_auth_key_configured_mismatch() {
 async fn test_auth_key_configured_missing() {
     let pool = create_test_db().await;
     let mut config = crate::test_utils::create_test_config();
-    config.auth.api_key = Some("secret".to_string());
+    config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
     let app = build_router(pool, &config);
 

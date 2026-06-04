@@ -108,8 +108,11 @@ pub(super) async fn request_iat(
     let response = http_client
         .post(&api_url)
         .bearer_auth(jwt)
-        .header("Accept", &config.github_api.accept_header)
-        .header("X-GitHub-Api-Version", &config.github_api.version)
+        .header("Accept", config.github_api.accept_header.to_string())
+        .header(
+            "X-GitHub-Api-Version",
+            config.github_api.version.to_string(),
+        )
         .send()
         .await?;
 

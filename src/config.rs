@@ -1,8 +1,12 @@
 use config::{Config as ConfigCrate, Environment};
 use serde::Deserialize;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
+use url::Url;
 use validator::Validate;
 
+use crate::domain::{AcceptHeader, ApiVersion, NonEmptyString};
 use crate::error::FatalError;
 
 /// Holds all application-wide configuration settings.
@@ -51,12 +55,10 @@ impl Config {
 #[derive(Clone, Deserialize, Validate)]
 pub struct ServerConfig {
     /// The bind address for the server.
-    #[validate(length(min = 1))]
-    pub address: String,
+    pub address: SocketAddr,
 
     /// The User-Agent string for HTTP requests.
-    #[validate(length(min = 1))]
-    pub user_agent: String,
+    pub user_agent: NonEmptyString,
 
     /// Timeout duration for incoming HTTP requests.
     #[serde(with = "humantime_serde")]
@@ -71,8 +73,7 @@ pub struct ServerConfig {
 #[derive(Clone, Deserialize, Validate)]
 pub struct DatabaseConfig {
     /// The connection URL for the database.
-    #[validate(length(min = 1))]
-    pub url: String,
+    pub url: Url,
 
     /// The database connection timeout duration.
     #[serde(with = "humantime_serde")]
@@ -91,16 +92,13 @@ pub struct DatabaseConfig {
 #[derive(Clone, Deserialize, Validate)]
 pub struct GitHubApiConfig {
     /// The base URL for the GitHub API.
-    #[validate(url)]
-    pub base_url: String,
+    pub base_url: Url,
 
     /// The specific GitHub API version to use.
-    #[validate(length(min = 1))]
-    pub version: String,
+    pub version: ApiVersion,
 
     /// The value of the Accept header.
-    #[validate(length(min = 1))]
-    pub accept_header: String,
+    pub accept_header: AcceptHeader,
 }
 
 /// Configuration for internal engine processes.
@@ -142,13 +140,11 @@ pub struct AuthConfig {
     ///
     /// If set, the `X-API-KEY` header must be present
     /// and match this value on sensible requests.
-    pub api_key: Option<String>,
+    pub api_key: Option<NonEmptyString>,
 
     /// GitHub App's Client ID.
-    #[validate(length(min = 1))]
-    pub client_id: String,
+    pub client_id: NonEmptyString,
 
     /// Path to the GitHub App's private key.
-    #[validate(length(min = 1))]
-    pub pem_path: String,
+    pub pem_path: PathBuf,
 }
