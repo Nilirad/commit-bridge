@@ -8,7 +8,6 @@ use tracing::info;
 
 use crate::{
     config::Config,
-    error::FatalError,
     model::Subscriber,
     trigger::error::{AuthError, RequestError},
 };
@@ -22,9 +21,6 @@ pub trait Authenticator {
 
 /// An [`Authenticator`] for GitHub.
 pub struct GitHubAuthenticator {
-    /// The credentials to authenticate to the server.
-    pub credentials: AuthCredentials,
-
     /// The HTTP client to make requests to the authentication server.
     pub http_client: reqwest::Client,
 
@@ -38,18 +34,9 @@ impl Authenticator for GitHubAuthenticator {
         &self,
         subscriber: &Subscriber,
     ) -> Result<String, AuthError> {
-        let jwt = generate_gh_jwt(&self.credentials, &self.config)?;
+        let jwt = generate_gh_jwt(&self.config)?;
         request_iat(&self.http_client, &jwt, subscriber, &self.config).await
     }
-}
-
-/// Credentials required for authentication.
-#[derive(Debug, Clone)]
-pub struct AuthCredentials {
-    /// GitHub App's Client ID.
-    pub client_id: String,
-    /// Path to the GitHub App's private key.
-    pub pem_path: String,
 }
 
 /// Payload that GitHub expects in the JWT.
@@ -70,31 +57,15 @@ struct GitHubClaims {
     iss: String,
 }
 
-/// Reads the environment variables for authentication.
-pub fn get_auth_credentials() -> Result<AuthCredentials, FatalError> {
-    let client_id = std::env::var("GH_CLIENT_ID")
-        .map_err(|_| FatalError::EnvVarNotSet("GH_CLIENT_ID".to_string()))?;
-    let pem_path = std::env::var("GH_APP_KEY_PATH")
-        .map_err(|_| FatalError::EnvVarNotSet("GH_APP_KEY_PATH".to_string()))?;
-
-    Ok(AuthCredentials {
-        client_id,
-        pem_path,
-    })
-}
-
 /// Generates a JWT to authenticate access to the GitHub App.
 ///
 /// Implementation based on [GitHub's documentation][jwt_docs].
 ///
 /// <!-- LINKS -->
 /// [jwt_docs]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app
-pub(super) fn generate_gh_jwt(
-    creds: &AuthCredentials,
-    config: &Config,
-) -> Result<String, AuthError> {
+pub(super) fn generate_gh_jwt(config: &Config) -> Result<String, AuthError> {
     // TODO: Check if you should use Tokio API.
-    let pem = std::fs::read(&creds.pem_path)?;
+    let pem = std::fs::read(&config.auth.pem_path)?;
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
@@ -102,7 +73,7 @@ pub(super) fn generate_gh_jwt(
     let claims = GitHubClaims {
         iat: now - config.auth.clock_drift_buffer.as_secs(),
         exp: now + config.auth.token_validity.as_secs(),
-        iss: creds.client_id.to_string(),
+        iss: config.auth.client_id.to_string(),
     };
 
     let header = Header::new(Algorithm::RS256);

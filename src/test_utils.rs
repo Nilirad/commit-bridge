@@ -86,6 +86,8 @@ pub fn create_test_config() -> crate::config::Config {
             clock_drift_buffer: std::time::Duration::from_secs(1),
             token_validity: std::time::Duration::from_secs(1),
             api_key: None,
+            client_id: "test-client-id".to_string(),
+            pem_path: "test-pem-path".to_string(),
         },
     }
 }

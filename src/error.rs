@@ -7,6 +7,7 @@ use axum::{
 use config::ConfigError;
 use rovo::aide::OperationOutput;
 use thiserror::Error;
+use validator::ValidationErrors;
 
 /// Validation error.
 #[derive(Debug, Error)]
@@ -80,6 +81,10 @@ pub enum FatalError {
     /// Configuration is invalid.
     #[error(transparent)]
     Setup(SetupError),
+
+    /// Configuration validation failed.
+    #[error("Configuration validation failed: {0}")]
+    Validation(#[from] ValidationErrors),
 }
 
 /// Error about the setup configuration.

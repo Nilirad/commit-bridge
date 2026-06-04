@@ -14,7 +14,7 @@ use crate::{
 };
 
 mod auth;
-pub use auth::{Authenticator, GitHubAuthenticator, get_auth_credentials};
+pub use auth::{Authenticator, GitHubAuthenticator};
 pub mod error;
 
 /// Runs an asynchronous task

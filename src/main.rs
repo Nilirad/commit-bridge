@@ -33,7 +33,7 @@ use crate::{
     },
     polling::PollingEngine,
     state::AppState,
-    trigger::{GitHubAuthenticator, TriggerEngine, get_auth_credentials},
+    trigger::{GitHubAuthenticator, TriggerEngine},
 };
 
 /// Server configuration module.
@@ -115,7 +115,6 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
     let polling_engine = PollingEngine { ctx: ctx.clone() };
 
     let authenticator = Box::new(GitHubAuthenticator {
-        credentials: get_auth_credentials()?,
         http_client: http_client.clone(),
         config: ctx.config.clone(),
     });

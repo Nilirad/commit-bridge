@@ -105,8 +105,8 @@ cp .env.example .env
 ```
 
 Then,
-edit the `.env` file to add your GitHub App's client id (`GH_CLIENT_ID`)
-and prepare the necessary paths for your GitHub App private key.
+edit the `.env` file to add your GitHub App's client id (`RELAY__AUTH__CLIENT_ID`)
+and prepare the necessary paths for your GitHub App private key (`RELAY__AUTH__PEM_PATH`).
 Finally,
 follow one of the three options below.
 
