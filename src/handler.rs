@@ -4,6 +4,7 @@ use crate::error::HandlerError;
 use crate::model::{
     CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, UpdateSubscriber,
 };
+
 use crate::state::AppState;
 use axum::{
     Json,
@@ -285,6 +286,7 @@ mod tests {
     )]
 
     use super::*;
+    use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
     use crate::model::CreateSubscriber;
     use crate::state::AppState;
     use crate::test_utils::create_test_db;
@@ -299,10 +301,10 @@ mod tests {
             api_key: None,
         };
         let payload = CreateSubscriber {
-            source_repo_url: "https://github.com/org/repo".to_string(),
-            source_branch_name: "main".to_string(),
-            target_repo: "https://github.com/org/target".to_string(),
-            event_type: "dispatch".to_string(),
+            source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),
+            source_branch_name: BranchName::new("main".to_string()).unwrap(),
+            target_repo: TargetRepo::new("org/target".to_string()).unwrap(),
+            event_type: EventType::new("dispatch".to_string()).unwrap(),
             gh_app_installation_id: 1,
         };
 
@@ -327,7 +329,7 @@ mod tests {
 
         // Update
         let update_payload = UpdateSubscriber {
-            target_repo: Some("https://github.com/org/new-target".to_string()),
+            target_repo: Some(TargetRepo::new("org/new-target".to_string()).unwrap()),
             event_type: None,
             gh_app_installation_id: None,
         };
@@ -336,8 +338,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             updated.subscriber.target_repo,
-            "https://github.com/org/new-target"
+            TargetRepo::new("org/new-target".to_string()).unwrap()
         );
+
         assert_eq!(updated.links.self_link.href, format!("/subscribers/{}", id));
 
         // Delete

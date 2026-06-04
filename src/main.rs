@@ -33,12 +33,13 @@ use crate::{
     },
     polling::PollingEngine,
     state::AppState,
-    trigger::{GitHubAuthenticator, TriggerEngine, get_auth_credentials},
+    trigger::{GitHubAuthenticator, TriggerEngine},
 };
 
 /// Server configuration module.
 mod config;
 mod context;
+mod domain;
 mod engine;
 mod error;
 mod handler;
@@ -90,7 +91,7 @@ async fn run_app() -> Result<(), FatalError> {
 async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> {
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .acquire_timeout(config.database.timeout)
-        .connect(&config.database.url)
+        .connect(config.database.url.as_str())
         .await?;
 
     sqlx::migrate!().run(&pool).await?;
@@ -114,7 +115,6 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
     let polling_engine = PollingEngine { ctx: ctx.clone() };
 
     let authenticator = Box::new(GitHubAuthenticator {
-        credentials: get_auth_credentials()?,
         http_client: http_client.clone(),
         config: ctx.config.clone(),
     });
@@ -219,7 +219,7 @@ async fn run_server(
     token: CancellationToken,
     config: &Config,
 ) -> Result<(), FatalError> {
-    let listener = tokio::net::TcpListener::bind(&config.server.address)
+    let listener = tokio::net::TcpListener::bind(config.server.address)
         .await
         .map_err(FatalError::TcpBinding)?;
     println!("Server listening on http://{}", config.server.address);
@@ -239,7 +239,7 @@ async fn run_server(
 /// Creates a new HTTP client.
 pub fn build_http_client(config: &Config) -> Result<Client, ClientCreationError> {
     let client = Client::builder()
-        .user_agent(&config.server.user_agent)
+        .user_agent(config.server.user_agent.to_string())
         .timeout(config.server.out_request_timeout)
         .build()?;
 

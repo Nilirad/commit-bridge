@@ -7,6 +7,21 @@ use axum::{
 use config::ConfigError;
 use rovo::aide::OperationOutput;
 use thiserror::Error;
+use validator::ValidationErrors;
+
+/// Validation error.
+#[derive(Debug, Error)]
+pub enum ValidationError {
+    /// Invalid field value.
+    #[error("Validation error: {0}")]
+    InvalidValue(String),
+}
+
+impl IntoResponse for ValidationError {
+    fn into_response(self) -> Response {
+        (StatusCode::UNPROCESSABLE_ENTITY, self.to_string()).into_response()
+    }
+}
 
 /// An error happened inside an Axum handler.
 #[derive(Debug, Error)]
@@ -66,6 +81,10 @@ pub enum FatalError {
     /// Configuration is invalid.
     #[error(transparent)]
     Setup(SetupError),
+
+    /// Configuration validation failed.
+    #[error("Configuration validation failed: {0}")]
+    Validation(#[from] ValidationErrors),
 }
 
 /// Error about the setup configuration.
@@ -102,6 +121,10 @@ pub struct ClientCreationError(#[from] reqwest::Error);
 /// Error in retrieving a commit or its info using `git ls-remote`.
 #[derive(Debug, Error)]
 pub enum CommitHashError {
+    /// Validation error.
+    #[error("Validation error: {0}")]
+    Validation(#[from] ValidationError),
+
     /// I/O error while spawning the process.
     #[error("I/O error in `git ls-remote`: {0}")]
     Io(#[from] std::io::Error),

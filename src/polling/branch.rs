@@ -1,6 +1,6 @@
 //! Utilities for checking whether a branch has updated.
 
-use crate::{error::CommitHashError, model::Branch, polling::git::GitFetcher};
+use crate::{domain::CommitHash, error::CommitHashError, model::Branch, polling::git::GitFetcher};
 
 /// Enables comparison between a git branch row, and the newly fetched branch.
 pub(super) struct BranchInfo {
@@ -8,7 +8,7 @@ pub(super) struct BranchInfo {
     pub branch: Branch,
 
     /// The actual branch hash.
-    pub latest_hash: String,
+    pub latest_hash: CommitHash,
 }
 
 impl BranchInfo {
@@ -18,7 +18,7 @@ impl BranchInfo {
         fetcher: &F,
     ) -> Result<BranchInfo, CommitHashError> {
         let latest_hash = fetcher
-            .get_latest_hash(&branch.repo_url, &branch.name)
+            .get_latest_hash(branch.repo_url.as_str(), branch.name.as_str())
             .await?;
         Ok(BranchInfo {
             branch,

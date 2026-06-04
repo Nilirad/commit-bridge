@@ -93,6 +93,7 @@ async fn followup_poll(res: Result<(), PollingError>, ctx: &SharedContext) {
 #[cfg(test)]
 mod tests {
     use crate::context::SharedContext;
+    use crate::domain::CommitHash;
     use crate::polling::poll_branches;
     use crate::test_utils::MockGitFetcher;
     use std::sync::Arc;
@@ -103,18 +104,16 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
 
         // Insert a branch
-        sqlx::query!(
-            "INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)",
-            "repo",
-            "main",
-            "old-hash"
-        )
-        .execute(&pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)")
+            .bind("https://github.com/owner/repo")
+            .bind("main")
+            .bind("a".repeat(40))
+            .execute(&pool)
+            .await
+            .unwrap();
 
         let mock_fetcher = Arc::new(MockGitFetcher {
-            hash: "new-hash".to_string(),
+            hash: CommitHash::new("b".repeat(40)).unwrap(),
         });
 
         let ctx = SharedContext {
@@ -131,7 +130,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(branch.last_commit_hash, Some("new-hash".to_string()));
+        assert_eq!(branch.last_commit_hash, Some("b".repeat(40)));
 
         // Verify trigger queued
         let queued_event = sqlx::query!("SELECT branch_id, new_hash FROM trigger_queue")
@@ -139,7 +138,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(queued_event.branch_id, 1);
-        assert_eq!(queued_event.new_hash, "new-hash");
+        assert_eq!(queued_event.branch_id, Some(1));
+        assert_eq!(queued_event.new_hash, Some("b".repeat(40)));
     }
 }
