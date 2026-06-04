@@ -105,7 +105,7 @@ mod tests {
 
         // Insert a branch
         sqlx::query("INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)")
-            .bind("repo")
+            .bind("https://github.com/owner/repo")
             .bind("main")
             .bind("a".repeat(40))
             .execute(&pool)

@@ -32,28 +32,7 @@ impl std::fmt::Display for TargetRepo {
     }
 }
 
-// SQLx trait implementations
-impl sqlx::Type<sqlx::Sqlite> for TargetRepo {
-    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
-        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TargetRepo {
-    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        Ok(TargetRepo(s))
-    }
-}
-
-impl sqlx::Encode<'_, sqlx::Sqlite> for TargetRepo {
-    fn encode_by_ref(
-        &self,
-        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>,
-    ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
-        <String as sqlx::Encode<sqlx::Sqlite>>::encode_by_ref(&self.0, buf)
-    }
-}
+crate::derive_sqlx_traits!(TargetRepo);
 
 impl TryFrom<String> for TargetRepo {
     type Error = ValidationError;

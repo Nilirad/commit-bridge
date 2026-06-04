@@ -27,25 +27,12 @@ impl CommitHash {
 }
 
 // Add these to satisfy SQLx
-impl sqlx::Type<sqlx::Sqlite> for CommitHash {
-    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
-        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
-    }
-}
 
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for CommitHash {
-    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        Ok(CommitHash(s))
-    }
-}
+crate::derive_sqlx_traits!(CommitHash);
 
-impl sqlx::Encode<'_, sqlx::Sqlite> for CommitHash {
-    fn encode_by_ref(
-        &self,
-        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>,
-    ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
-        <String as sqlx::Encode<sqlx::Sqlite>>::encode_by_ref(&self.0, buf)
+impl AsRef<str> for CommitHash {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 

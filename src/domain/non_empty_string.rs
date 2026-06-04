@@ -26,6 +26,18 @@ impl NonEmptyString {
     }
 }
 
+impl std::fmt::Display for NonEmptyString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl AsRef<str> for NonEmptyString {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl TryFrom<String> for NonEmptyString {
     type Error = ValidationError;
 

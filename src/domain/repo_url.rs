@@ -33,6 +33,12 @@ impl RepoUrl {
     }
 }
 
+impl AsRef<str> for RepoUrl {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl TryFrom<String> for RepoUrl {
     type Error = ValidationError;
 
@@ -73,24 +79,4 @@ impl From<RepoUrl> for String {
     }
 }
 
-impl sqlx::Type<sqlx::Sqlite> for RepoUrl {
-    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
-        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RepoUrl {
-    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        Ok(RepoUrl(s))
-    }
-}
-
-impl sqlx::Encode<'_, sqlx::Sqlite> for RepoUrl {
-    fn encode_by_ref(
-        &self,
-        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>,
-    ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
-        <String as sqlx::Encode<sqlx::Sqlite>>::encode_by_ref(&self.0, buf)
-    }
-}
+crate::derive_sqlx_traits!(RepoUrl);
