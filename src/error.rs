@@ -121,6 +121,10 @@ pub struct ClientCreationError(#[from] reqwest::Error);
 /// Error in retrieving a commit or its info using `git ls-remote`.
 #[derive(Debug, Error)]
 pub enum CommitHashError {
+    /// Validation error.
+    #[error("Validation error: {0}")]
+    Validation(#[from] ValidationError),
+
     /// I/O error while spawning the process.
     #[error("I/O error in `git ls-remote`: {0}")]
     Io(#[from] std::io::Error),

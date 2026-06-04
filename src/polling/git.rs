@@ -1,6 +1,6 @@
 //! Operations to fetch and extract git branch data from remote repositories.
 
-use crate::error::CommitHashError;
+use crate::{domain::CommitHash, error::CommitHashError};
 use async_trait::async_trait;
 
 /// Allows running git commands.
@@ -10,7 +10,7 @@ pub trait GitFetcher: Send + Sync {
         &self,
         repo_url: &str,
         branch: &str,
-    ) -> Result<String, CommitHashError>;
+    ) -> Result<CommitHash, CommitHashError>;
 }
 
 /// Runs git commands.
@@ -22,7 +22,7 @@ impl GitFetcher for MainGitFetcher {
         &self,
         repo_url: &str,
         branch: &str,
-    ) -> Result<String, CommitHashError> {
+    ) -> Result<CommitHash, CommitHashError> {
         tokio::process::Command::new("git")
             .args(["ls-remote", repo_url, branch])
             .output()
@@ -48,8 +48,8 @@ fn extract_hash(
     stdout: Vec<u8>,
     repo_url: String,
     branch: String,
-) -> Result<String, CommitHashError> {
-    String::from_utf8_lossy(&stdout)
+) -> Result<CommitHash, CommitHashError> {
+    let hash_str = String::from_utf8_lossy(&stdout)
         .split_whitespace()
         .next()
         .map(|s| s.to_string())
@@ -57,7 +57,9 @@ fn extract_hash(
             stdout: String::from_utf8_lossy(&stdout).into_owned(),
             repo_url,
             branch,
-        })
+        })?;
+
+    Ok(CommitHash::new(hash_str)?)
 }
 
 #[cfg(test)]
@@ -80,7 +82,10 @@ mod tests {
 
         let result = extract_hash(stdout, repo_url, branch);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "678c4343237127dbadbf1806dd98b2154ffd2ebe");
+        assert_eq!(
+            result.unwrap().as_str(),
+            "678c4343237127dbadbf1806dd98b2154ffd2ebe"
+        );
     }
 
     #[test]

@@ -7,7 +7,7 @@
 )]
 
 use crate::{
-    domain::{AcceptHeader, ApiVersion, NonEmptyString},
+    domain::{AcceptHeader, ApiVersion, CommitHash, NonEmptyString},
     polling::git::GitFetcher,
     trigger::{Authenticator, error::AuthError},
 };
@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use url::Url;
 
 pub struct MockGitFetcher {
-    pub hash: String,
+    pub hash: CommitHash,
 }
 
 #[async_trait]
@@ -26,7 +26,7 @@ impl GitFetcher for MockGitFetcher {
         &self,
         _repo: &str,
         _branch: &str,
-    ) -> Result<String, crate::error::CommitHashError> {
+    ) -> Result<CommitHash, crate::error::CommitHashError> {
         Ok(self.hash.clone())
     }
 }

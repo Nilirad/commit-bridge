@@ -3,7 +3,8 @@
 //! The `Create_` `struct`s represent the payload
 //! to create the corresponding row.
 
-use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
+use crate::domain::{BranchName, CommitHash, EventType, RepoUrl, TargetRepo};
+use chrono::{DateTime, Utc};
 use rovo::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -23,13 +24,13 @@ pub struct Branch {
     /// SHA of the latest commit polled.
     ///
     /// `None` if the branch has not been processed.
-    pub last_commit_hash: Option<String>,
+    pub last_commit_hash: Option<CommitHash>,
 
-    /// Timestamp when the record was created, in standard SQL `DATETIME` format (`YYYY-MM-DD HH:MM:SS`).
-    pub created_at: String,
+    /// Timestamp when the record was created.
+    pub created_at: DateTime<Utc>,
 
-    /// Timestamp when the record was updated, in standard SQL `DATETIME` format (`YYYY-MM-DD HH:MM:SS`).
-    pub updated_at: String,
+    /// Timestamp when the record was updated.
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Represents a row in the `subscribers` table.
@@ -50,7 +51,7 @@ pub struct Subscriber {
     ///
     /// <!-- LINKS -->
     /// [`repository_dispatch`]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch
-    pub event_type: String,
+    pub event_type: EventType,
 
     /// Allows authenticating as a [GitHub App installation][gh_app_auth].
     ///
@@ -58,11 +59,11 @@ pub struct Subscriber {
     /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
     pub gh_app_installation_id: i64,
 
-    /// Timestamp when the record was created, in standard SQL `DATETIME` format (`YYYY-MM-DD HH:MM:SS`).
-    pub created_at: String,
+    /// Timestamp when the record was created.
+    pub created_at: DateTime<Utc>,
 
-    /// Timestamp when the record was updated, in standard SQL `DATETIME` format (`YYYY-MM-DD HH:MM:SS`).
-    pub updated_at: String,
+    /// Timestamp when the record was updated.
+    pub updated_at: DateTime<Utc>,
 }
 
 /// HAL link structure.
@@ -137,7 +138,7 @@ pub struct TriggerQueueItem {
     pub branch_id: i64,
 
     /// The hash of the latest commit on the branch.
-    pub new_hash: String,
+    pub new_hash: CommitHash,
 
     /// Number of times the task has been attempted.
     pub retry_count: i64,
