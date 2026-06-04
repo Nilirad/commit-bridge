@@ -138,7 +138,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(queued_event.branch_id, 1);
-        assert_eq!(queued_event.new_hash, "b".repeat(40));
+        assert_eq!(queued_event.branch_id, Some(1));
+        assert_eq!(queued_event.new_hash, Some("b".repeat(40)));
     }
 }

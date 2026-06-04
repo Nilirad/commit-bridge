@@ -227,7 +227,8 @@ async fn send_repository_dispatch(
 ) -> Result<(), WorkflowTriggerError> {
     let api_url = format!(
         "{}/repos/{}/dispatches",
-        engine.ctx.config.github_api.base_url, sub.target_repo
+        engine.ctx.config.github_api.base_url.as_str().trim_end_matches('/'),
+        sub.target_repo
     );
 
     let payload = serde_json::json!({

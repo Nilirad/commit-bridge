@@ -103,7 +103,8 @@ pub(super) async fn request_iat(
 
     let api_url = format!(
         "{}/app/installations/{}/access_tokens",
-        config.github_api.base_url, sub.gh_app_installation_id
+        config.github_api.base_url.as_str().trim_end_matches('/'),
+        sub.gh_app_installation_id
     );
     let response = http_client
         .post(&api_url)
