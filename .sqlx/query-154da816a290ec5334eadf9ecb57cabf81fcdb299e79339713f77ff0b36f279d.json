@@ -18,8 +18,8 @@
       "Right": 0
     },
     "nullable": [
-      false,
-      false
+      true,
+      true
     ]
   },
   "hash": "154da816a290ec5334eadf9ecb57cabf81fcdb299e79339713f77ff0b36f279d"

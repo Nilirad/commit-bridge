@@ -227,7 +227,13 @@ async fn send_repository_dispatch(
 ) -> Result<(), WorkflowTriggerError> {
     let api_url = format!(
         "{}/repos/{}/dispatches",
-        engine.ctx.config.github_api.base_url.as_str().trim_end_matches('/'),
+        engine
+            .ctx
+            .config
+            .github_api
+            .base_url
+            .as_str()
+            .trim_end_matches('/'),
         sub.target_repo
     );
 
@@ -295,15 +301,41 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
 
         // Insert tasks
+        // Insert tasks
+        let hash = "a".repeat(40);
         // 1. Processing (stuck)
-        sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now', '-10 minutes'))")
-            .bind(1).bind("a".repeat(40)).bind("PROCESSING").bind(0).execute(&pool).await.unwrap();
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now', '-10 minutes'))",
+            1,
+            hash,
+            "PROCESSING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         // 2. Processing (recent)
-        sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now', '-1 minute'))")
-            .bind(1).bind("a".repeat(40)).bind("PROCESSING").bind(0).execute(&pool).await.unwrap();
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now', '-1 minute'))",
+            1,
+            hash,
+            "PROCESSING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         // 3. Pending
-        sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now'))")
-            .bind(1).bind("a".repeat(40)).bind("PENDING").bind(0).execute(&pool).await.unwrap();
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now'))",
+            1,
+            hash,
+            "PENDING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
 
         recover_stuck_tasks(&pool, &crate::test_utils::create_test_config())
             .await
@@ -325,12 +357,39 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
 
         // Insert some dummy items
-        sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '-1 minute'))")
-            .bind(1).bind("a".repeat(40)).bind("PENDING").bind(0).execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '-5 minutes'))")
-            .bind(1).bind("a".repeat(40)).bind("PENDING").bind(0).execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '+1 minute'))")
-            .bind(1).bind("a".repeat(40)).bind("PENDING").bind(0).execute(&pool).await.unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '-1 minute'))",
+            1,
+            hash,
+            "PENDING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '-5 minutes'))",
+            1,
+            hash,
+            "PENDING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '+1 minute'))",
+            1,
+            hash,
+            "PENDING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
 
         let trigger = get_oldest_queued_trigger(&pool).await.unwrap().unwrap();
 
@@ -349,8 +408,17 @@ mod tests {
     async fn test_schedule_retry() {
         let pool = crate::test_utils::create_test_db().await;
         let hash = "a".repeat(40);
-        let id = sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now'))")
-            .bind(1).bind(hash).bind("PROCESSING").bind(0).execute(&pool).await.unwrap().last_insert_rowid();
+        let id = sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now'))",
+            1,
+            hash,
+            "PROCESSING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap()
+        .last_insert_rowid();
 
         let trigger = TriggerQueueItem {
             id,
@@ -428,8 +496,17 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        sqlx::query("INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, '2000-01-01 00:00:00')")
-            .bind(1).bind("a".repeat(40)).bind("PENDING").bind(0).execute(&pool).await.unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, '2000-01-01 00:00:00')",
+            1,
+            hash,
+            "PENDING",
+            0
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
 
         let engine = TriggerEngine {
             ctx: SharedContext {
