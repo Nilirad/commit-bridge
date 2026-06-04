@@ -26,6 +26,11 @@ impl BranchName {
     pub fn into_inner(self) -> String {
         self.0
     }
+
+    /// Get a reference to the inner string.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl TryFrom<String> for BranchName {

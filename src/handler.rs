@@ -63,8 +63,8 @@ async fn create_subscriber_inner(
         "INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?) RETURNING *"
     )
     .bind(branch_id)
-    .bind(payload.target_repo.clone().into_inner())
-    .bind(payload.event_type.clone().into_inner())
+    .bind(&payload.target_repo)
+    .bind(&payload.event_type)
     .bind(payload.gh_app_installation_id)
     .fetch_one(&mut *transaction)
     .await?;
@@ -180,12 +180,12 @@ async fn update_subscriber_inner(
     if let Some(target_repo) = &payload.target_repo {
         separated
             .push("target_repo = ")
-            .push_bind_unseparated(target_repo.clone().into_inner());
+            .push_bind_unseparated(target_repo);
     }
     if let Some(event_type) = &payload.event_type {
         separated
             .push("event_type = ")
-            .push_bind_unseparated(event_type.clone().into_inner());
+            .push_bind_unseparated(event_type);
     }
     if let Some(gh_app_installation_id) = payload.gh_app_installation_id {
         separated
@@ -258,8 +258,8 @@ async fn get_or_insert_branch_id(
 ) -> Result<i64, HandlerError> {
     let branch_id_opt =
         sqlx::query_scalar::<_, i64>("SELECT id FROM branches WHERE repo_url = ? AND name = ?")
-            .bind(payload.source_repo_url.clone().into_inner())
-            .bind(payload.source_branch_name.clone().into_inner())
+            .bind(&payload.source_repo_url)
+            .bind(&payload.source_branch_name)
             .fetch_optional(&mut *transaction)
             .await?;
 
@@ -268,8 +268,8 @@ async fn get_or_insert_branch_id(
     }
 
     sqlx::query_scalar::<_, i64>("INSERT INTO branches (repo_url, name) VALUES (?, ?) RETURNING id")
-        .bind(payload.source_repo_url.clone().into_inner())
-        .bind(payload.source_branch_name.clone().into_inner())
+        .bind(&payload.source_repo_url)
+        .bind(&payload.source_branch_name)
         .fetch_one(&mut *transaction)
         .await
         .map_err(Into::into)
