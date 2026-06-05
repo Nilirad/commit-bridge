@@ -154,6 +154,10 @@ pub struct AuthConfig {
     /// and match this value on sensible requests.
     pub api_key: Option<NonEmptyString>,
 
+    /// Allow unauthenticated access to the API.
+    #[serde(default)]
+    pub allow_unauthenticated: bool,
+
     /// GitHub App's Client ID.
     pub client_id: NonEmptyString,
 

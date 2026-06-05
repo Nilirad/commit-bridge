@@ -14,6 +14,7 @@ use axum::{
     extract::State,
     http::{HeaderValue, Request, Response, StatusCode, header},
     middleware::{self, Next},
+    response::IntoResponse,
 };
 use reqwest::Client;
 use rovo::Router as RovoRouter;
@@ -134,16 +135,19 @@ async fn auth_middleware(
     req: Request<Body>,
     next: Next,
 ) -> Response<Body> {
-    if req.uri().path().starts_with("/subscribers")
-        && let Some(api_key) = &state.api_key
-    {
+    let needs_authentication =
+        req.uri().path().starts_with("/subscribers") && !state.allow_unauthenticated;
+
+    if needs_authentication {
         let auth_header = req.headers().get("X-API-KEY").and_then(|v| v.to_str().ok());
 
-        if auth_header != Some(api_key) {
-            return Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .body(Body::empty())
-                .unwrap();
+        let authorized = state
+            .api_key
+            .as_ref()
+            .is_some_and(|key| Some(key.as_str()) == auth_header);
+
+        if !authorized {
+            return StatusCode::UNAUTHORIZED.into_response();
         }
     }
 
@@ -177,6 +181,7 @@ pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
     let state = AppState {
         db_pool: pool,
         api_key: config.auth.api_key.clone(),
+        allow_unauthenticated: config.auth.allow_unauthenticated,
     };
 
     let mut api = OpenApi::default();

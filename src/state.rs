@@ -13,4 +13,7 @@ pub struct AppState {
 
     /// Optional API key for authentication.
     pub api_key: Option<NonEmptyString>,
+
+    /// Allow unauthenticated access to the API.
+    pub allow_unauthenticated: bool,
 }

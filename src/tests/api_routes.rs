@@ -8,7 +8,8 @@ use tower::ServiceExt; // for oneshot
 #[tokio::test]
 async fn test_subscriber_api_routes() {
     let pool = create_test_db().await;
-    let config = crate::test_utils::create_test_config();
+    let mut config = crate::test_utils::create_test_config();
+    config.auth.allow_unauthenticated = true;
 
     let app = build_router(pool, &config);
 
