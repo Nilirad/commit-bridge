@@ -1,13 +1,9 @@
 # Relay Server
 
 Triggering a repository workflow
-in response to a commit on a different repository
-is not a trivial problem.
-This is particularly useful 
-for projects that have git dependencies.
-Triggering a CI workflow
-when a git dependency gets updated
-is important for detecting breaking changes as soon as possible.
+in response to a commit on a different repository is not a trivial problem.
+This is particularly useful for projects that have git dependencies,
+where breaking changes need to be detected as soon as possible.
 
 This project attempts to solve this problem
 by providing a server that acts as an intermediary
@@ -35,7 +31,6 @@ Then,
 annotate your client id
 and download your private PEM key.
 
-
 **Setup workflow on target repository.**
 Set up your GitHub Actions workflow
 to be triggered by a `repository_dispatch` event:
@@ -57,13 +52,9 @@ Clone this repository:
 git clone https://github.com/Nilirad/relay.git
 ```
 
-Follow the instructions in the **"Setup"** section,
-then run the server
-(unless you already deployed a container):
-
-```shell
-cargo run --release
-```
+Then,
+follow the instructions in the **"Setup"** section
+to run the server.
 
 **Populate the database.**
 Populate the database with the subscriptions you need.
@@ -110,6 +101,18 @@ and prepare the necessary paths for your GitHub App private key (`RELAY__AUTH__P
 Finally,
 follow one of the three options below.
 
+> [!NOTE]
+> The server autonomously loads the environment variables in `.env`
+> _only_ in `debug` builds.
+> Builds in the `release` profile expect the environment variables to be already set.
+>
+> This shell command should be able to bring the variables in `.env`
+> in your enviroment:
+> 
+> ```shell
+> export $(xargs < .env)
+> ```
+
 ### Docker deployment
 
 For containerized deployment,
@@ -137,7 +140,21 @@ Just run `nix develop`
 to enter a shell with the required environment.
 If you use [`nix-direnv`],
 you can automatically enter the shell
-just by entering the workspace directory.
+and load the `.env` variables
+just by entering the workspace directory with a terminal.
+
+Launch the server using one of the following commands:
+
+```shell
+# Works without `direnv`
+cargo run
+
+# Note: Ensure your environment variables are set
+cargo run --release
+
+# Alternative command (still requires environment variables to be set)
+nix run
+```
 
 ### Manual setup
 
@@ -149,6 +166,17 @@ by manually configuring the environment:
   (build-time dependency).
 - Install `git`
   (runtime dependency).
+
+Then,
+launch the server:
+
+```shell
+# Works with minimal setup
+cargo run
+
+# Requires manually loading environment variables
+cargo run --release
+```
 
 <!-- LINKS -->
 [`Nix`]: https://nixos.org/learn/
