@@ -64,6 +64,9 @@ type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 async fn run_app() -> Result<(), FatalError> {
     tracing_subscriber::fmt::init();
 
+    #[cfg(debug_assertions)]
+    tracing::warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
+
     let config = Config::load()?;
     let pool = init_database(&config).await?;
     let http_client = build_http_client(&config)?;

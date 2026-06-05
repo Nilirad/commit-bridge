@@ -37,6 +37,10 @@ impl Config {
     /// Bootstraps the application configuration from the environment.
     pub fn load() -> Result<Self, FatalError> {
         if dotenvy::dotenv().is_ok() {
+            #[cfg(debug_assertions)]
+            tracing::info!("Successfully loaded local `.env` file.");
+
+            #[cfg(not(debug_assertions))]
             tracing::warn!(
                 "Successfully loaded local `.env` file. \
                 If this is a production build, \
