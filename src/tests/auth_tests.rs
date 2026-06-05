@@ -6,10 +6,34 @@ use axum::{
 use tower::ServiceExt; // for oneshot
 
 #[tokio::test]
-async fn test_auth_no_key_configured() {
+async fn test_auth_no_key_configured_fails() {
     let pool = create_test_db().await;
     let mut config = crate::test_utils::create_test_config();
     config.auth.api_key = None;
+    config.auth.allow_unauthenticated = false;
+
+    let app = build_router(pool, &config);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/subscribers")
+                .method("GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_auth_allowed_unauthenticated_success() {
+    let pool = create_test_db().await;
+    let mut config = crate::test_utils::create_test_config();
+    config.auth.api_key = None;
+    config.auth.allow_unauthenticated = true;
 
     let app = build_router(pool, &config);
 

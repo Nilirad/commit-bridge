@@ -299,6 +299,7 @@ mod tests {
         let state = AppState {
             db_pool: pool.clone(),
             api_key: None,
+            allow_unauthenticated: false,
         };
         let payload = CreateSubscriber {
             source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),

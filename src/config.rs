@@ -59,6 +59,14 @@ impl Config {
 
         config.validate()?;
 
+        if config.auth.allow_unauthenticated {
+            tracing::warn!(
+                "API AUTHENTICATION DISABLED. \
+                Please do not set `RELAY__AUTH__ALLOW_UNAUTHENTICATED=true` \
+                on production environments."
+            );
+        }
+
         Ok(config)
     }
 }
@@ -153,6 +161,10 @@ pub struct AuthConfig {
     /// If set, the `X-API-KEY` header must be present
     /// and match this value on sensible requests.
     pub api_key: Option<NonEmptyString>,
+
+    /// Allow unauthenticated access to the API.
+    #[serde(default)]
+    pub allow_unauthenticated: bool,
 
     /// GitHub App's Client ID.
     pub client_id: NonEmptyString,
