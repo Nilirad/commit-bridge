@@ -12,5 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/relay /usr/local/bin/relay
 ENV RELAY__DATABASE__URL="sqlite:///app/data/relay.db?mode=rwc"
+VOLUME ["/app/data"]
+EXPOSE 3000
 WORKDIR /app/data
 CMD ["relay"]
