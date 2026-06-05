@@ -20,9 +20,10 @@ use reqwest::Client;
 use rovo::Router as RovoRouter;
 use rovo::aide::openapi::OpenApi;
 use rovo::rovo;
+use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tower_http::timeout::TimeoutLayer;
-use tracing::error;
+use tracing::{error, info};
 
 use crate::{
     config::Config,
@@ -230,13 +231,38 @@ async fn run_server(
         "Scalar UI available at http://{}/scalar",
         config.server.address
     );
+
     axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .map_err(FatalError::Serve)?;
 
     token.cancel();
 
     Ok(())
+}
+
+/// Creates a future that resolves when a termination signal is received.
+async fn shutdown_signal() {
+    let ctrl_c = signal::ctrl_c();
+
+    #[cfg(unix)]
+    let terminate = async {
+        if let Ok(mut signal) = signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            signal.recv().await;
+        } else {
+            std::future::pending::<()>().await;
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    info!("Shutdown signal received, initiating graceful shutdown...");
 }
 
 /// Creates a new HTTP client.
