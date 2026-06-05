@@ -101,18 +101,6 @@ and prepare the necessary paths for your GitHub App private key (`RELAY__AUTH__P
 Finally,
 follow one of the three options below.
 
-> [!NOTE]
-> The server autonomously loads the environment variables in `.env`
-> _only_ in `debug` builds.
-> Builds in the `release` profile expect the environment variables to be already set.
->
-> This shell command should be able to bring the variables in `.env`
-> in your enviroment:
-> 
-> ```shell
-> export $(xargs < .env)
-> ```
-
 ### Docker deployment
 
 For containerized deployment,
@@ -140,19 +128,15 @@ Just run `nix develop`
 to enter a shell with the required environment.
 If you use [`nix-direnv`],
 you can automatically enter the shell
-and load the `.env` variables
 just by entering the workspace directory with a terminal.
 
 Launch the server using one of the following commands:
 
 ```shell
-# Works without `direnv`
 cargo run
 
-# Note: Ensure your environment variables are set
 cargo run --release
 
-# Alternative command (still requires environment variables to be set)
 nix run
 ```
 
@@ -171,10 +155,8 @@ Then,
 launch the server:
 
 ```shell
-# Works with minimal setup
 cargo run
 
-# Requires manually loading environment variables
 cargo run --release
 ```
 
