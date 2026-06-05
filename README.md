@@ -168,17 +168,29 @@ cargo run --release
 
 ## Security
 
-You can secure the API by requiring an API key for all sensible endpoint interactions.
+By default, this server mandates authentication for all `/subscribers` endpoints.
 
-1.  **Configure:** In your `.env` file, set the `RELAY__AUTH__API_KEY` environment variable to a secure value.
-2.  **Authenticate:** When making requests to `/subscribers` (via `curl` or other tools), include the key in the header:
+1. **Configure:** Set the `RELAY__AUTH__API_KEY` environment variable to a secure value in your `.env` file.
+2. **Authenticate:** Include the key in the `X-API-KEY` header for all requests:
 
     ```shell
     curl -X GET http://localhost:3000/subscribers \
       -H "X-API-KEY: YOUR_API_KEY"
     ```
 
-If `RELAY__AUTH__API_KEY` is not set in your environment, authentication is disabled, allowing unrestricted access to these endpoints.
+### Disabling Authentication (Not Recommended)
+
+> [!warning]
+> Enabling this flag allows unrestricted access
+> to endpoints capable of triggering remote GitHub workflows.
+> Use only in trusted development environments.
+
+If you require an unauthenticated setup for rapid local prototyping,
+you can explicitly opt-in by setting the following environment variable:
+
+```text
+RELAY__AUTH__ALLOW_UNAUTHENTICATED=true
+```
 
 ## License
 
