@@ -22,6 +22,7 @@ use rovo::aide::openapi::OpenApi;
 use rovo::rovo;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tower_http::timeout::TimeoutLayer;
 use tracing::{error, info};
 
@@ -56,14 +57,20 @@ mod trigger;
 
 #[tokio::main]
 async fn main() {
-    run_app().await.unwrap_or_else(|e| error!("{e}"));
+    let tracker = TaskTracker::new();
+
+    run_app(&tracker).await.unwrap_or_else(|e| error!("{e}"));
+
+    tracker.close();
+    tracker.wait().await;
+    info!("All systems terminated. Terminating process.")
 }
 
 /// A task for an engine to be started.
 type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 
 /// Runs the server, delegating errors to the caller.
-async fn run_app() -> Result<(), FatalError> {
+async fn run_app(tracker: &TaskTracker) -> Result<(), FatalError> {
     tracing_subscriber::fmt::init();
 
     #[cfg(debug_assertions)]
@@ -79,7 +86,7 @@ async fn run_app() -> Result<(), FatalError> {
 
     let engines = init_engines(&ctx, http_client)?;
     for (engine, message) in engines {
-        crate::engine::start_engine(engine, message);
+        crate::engine::start_engine(engine, message, tracker);
     }
 
     let app = build_router(pool, &config);
