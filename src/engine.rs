@@ -1,6 +1,7 @@
 //! Interface definitions for async engines.
 
 use async_trait::async_trait;
+use tokio_util::task::TaskTracker;
 
 use tracing::info;
 
@@ -12,9 +13,9 @@ pub trait AsyncEngine: Send + Sync + 'static {
 }
 
 /// Starts the engine by spawning it in a new task.
-pub fn start_engine(engine: Box<dyn AsyncEngine>, message: &str) {
+pub fn start_engine(engine: Box<dyn AsyncEngine>, message: &str, tracker: &TaskTracker) {
     info!(message);
-    tokio::spawn(async move {
+    tracker.spawn(async move {
         engine.run().await;
     });
 }
