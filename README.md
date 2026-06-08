@@ -178,6 +178,17 @@ By default, this server mandates authentication for all `/subscribers` endpoints
       -H "X-API-KEY: YOUR_API_KEY"
     ```
 
+### API Key Security
+
+To mitigate timing attacks,
+the server uses constant-time comparison for API keys.
+Note that while this protects against key content discovery,
+an attacker may still be able to infer the length of the API key
+by measuring response times.
+For maximum security,
+ensure that your `RELAY__AUTH__API_KEY` is long
+and generated using a cryptographically secure random source.
+
 ### Disabling Authentication (Not Recommended)
 
 > [!warning]

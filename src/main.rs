@@ -20,6 +20,7 @@ use reqwest::Client;
 use rovo::Router as RovoRouter;
 use rovo::aide::openapi::OpenApi;
 use rovo::rovo;
+use subtle::ConstantTimeEq;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
@@ -152,7 +153,17 @@ async fn auth_middleware(
         let authorized = state
             .api_key
             .as_ref()
-            .is_some_and(|key| Some(key.as_str()) == auth_header);
+            .zip(auth_header)
+            .is_some_and(|(key, header)| {
+                let key_bytes = key.as_bytes();
+                let header_bytes = header.as_bytes();
+                // `ct_eq` short-circuits if lengths of the byte slices are unequal.
+                // While this allows an attacker to extract the key length,
+                // it is order of magnitudes safer than using a simple string equality test,
+                // which would allow the attacker to gradually know the exact key
+                // over many requests.
+                key_bytes.ct_eq(header_bytes).into()
+            });
 
         if !authorized {
             return StatusCode::UNAUTHORIZED.into_response();
