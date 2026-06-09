@@ -6,6 +6,7 @@ use async_trait::async_trait;
 /// Allows running git commands.
 #[async_trait]
 pub trait GitFetcher: Send + Sync {
+    /// Returns the latest hash of a git branch.
     async fn get_latest_hash(
         &self,
         repo_url: &str,

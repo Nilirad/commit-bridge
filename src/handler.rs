@@ -1,5 +1,8 @@
 //! Axum route handlers.
 
+// Needed to bypass a warning raised inside the `#[rovo]` macro.
+#![allow(missing_docs, clippy::missing_docs_in_private_items)]
+
 use crate::error::HandlerError;
 use crate::model::{
     CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, UpdateSubscriber,

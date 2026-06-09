@@ -70,7 +70,7 @@ pub enum FatalError {
     Serve(#[source] std::io::Error),
 
     // Docs deferred to inner type.
-    #[allow(clippy::missing_docs_in_private_items)]
+    #[allow(missing_docs)]
     #[error("HTTP Client creation: {0}")]
     ClientCreation(#[from] ClientCreationError),
 
