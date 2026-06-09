@@ -32,6 +32,7 @@ validator = { version = "0.20.0", features = ["derive"] }
 
 [dev-dependencies]
 dudect-bencher = "0.7.0"
+rand = "0.10.1"
 tokio-test = "0.4"
 wiremock = "0.6"
 
