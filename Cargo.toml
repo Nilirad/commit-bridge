@@ -19,6 +19,7 @@ schemars = { version = "0.9", features = ["chrono04"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio-rustls", "macros", "chrono" ] }
+subtle = "2.6.1"
 thiserror = "2.0.18"
 tokio = { version = "1.51.1", features = ["process", "rt-multi-thread", "signal"] }
 tokio-util = { version = "0.7.18", features = ["rt"] }
@@ -30,6 +31,8 @@ url = { version = "2.5.4", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 
 [dev-dependencies]
+dudect-bencher = "0.7.0"
+rand = "0.10.1"
 tokio-test = "0.4"
 wiremock = "0.6"
 
