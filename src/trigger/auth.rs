@@ -26,6 +26,9 @@ pub struct GitHubAuthenticator {
 
     /// Application configuration.
     pub config: Config,
+
+    /// The key to sign JWTs.
+    pub encoding_key: EncodingKey,
 }
 
 #[async_trait]
@@ -34,7 +37,7 @@ impl Authenticator for GitHubAuthenticator {
         &self,
         subscriber: &Subscriber,
     ) -> Result<String, AuthError> {
-        let jwt = generate_gh_jwt(&self.config)?;
+        let jwt = generate_gh_jwt(&self.encoding_key, &self.config)?;
         request_iat(&self.http_client, &jwt, subscriber, &self.config).await
     }
 }
@@ -63,10 +66,7 @@ struct GitHubClaims {
 ///
 /// <!-- LINKS -->
 /// [jwt_docs]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app
-pub(super) fn generate_gh_jwt(config: &Config) -> Result<String, AuthError> {
-    // TODO: Check if you should use Tokio API.
-    let pem = std::fs::read(&config.auth.pem_path)?;
-
+pub(super) fn generate_gh_jwt(key: &EncodingKey, config: &Config) -> Result<String, AuthError> {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
@@ -77,9 +77,8 @@ pub(super) fn generate_gh_jwt(config: &Config) -> Result<String, AuthError> {
     };
 
     let header = Header::new(Algorithm::RS256);
-    let key = EncodingKey::from_rsa_pem(&pem)?;
 
-    let jwt = encode(&header, &claims, &key)?;
+    let jwt = encode(&header, &claims, key)?;
     Ok(jwt)
 }
 

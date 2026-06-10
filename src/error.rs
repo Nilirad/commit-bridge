@@ -78,6 +78,14 @@ pub enum FatalError {
     #[error("Environment variable '{0}' not set")]
     EnvVarNotSet(String),
 
+    /// Could not load the authentication key.
+    #[error("Failed to load authentication key: {0}")]
+    AuthKeyLoading(#[source] jsonwebtoken::errors::Error),
+
+    /// Could not read the authentication key file.
+    #[error("Failed to read authentication key file: {0}")]
+    AuthKeyIo(#[source] std::io::Error),
+
     /// Configuration is invalid.
     #[error(transparent)]
     Setup(SetupError),
