@@ -8,6 +8,7 @@
     clippy::indexing_slicing
 )]
 
+use std::fs;
 use std::str::FromStr;
 
 use axum::{
@@ -18,6 +19,7 @@ use axum::{
     middleware::{self, Next},
     response::IntoResponse,
 };
+use jsonwebtoken::EncodingKey;
 use reqwest::Client;
 use rovo::Router as RovoRouter;
 use rovo::aide::openapi::OpenApi;
@@ -111,9 +113,13 @@ fn init_context(pool: sqlx::SqlitePool, config: Config, token: CancellationToken
 fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTask>, FatalError> {
     let polling_engine = PollingEngine { ctx: ctx.clone() };
 
+    let pem = fs::read(&ctx.config.auth.pem_path).map_err(FatalError::AuthKeyIo)?;
+    let encoding_key = EncodingKey::from_rsa_pem(&pem).map_err(FatalError::AuthKeyLoading)?;
+
     let authenticator = Box::new(GitHubAuthenticator {
         http_client: http_client.clone(),
         config: ctx.config.clone(),
+        encoding_key,
     });
     let trigger_engine = TriggerEngine {
         ctx: ctx.clone(),
