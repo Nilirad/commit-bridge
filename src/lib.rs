@@ -8,6 +8,8 @@
     clippy::indexing_slicing
 )]
 
+use std::str::FromStr;
+
 use axum::{
     Router,
     body::Body,
@@ -20,6 +22,7 @@ use reqwest::Client;
 use rovo::Router as RovoRouter;
 use rovo::aide::openapi::OpenApi;
 use rovo::rovo;
+use sqlx::sqlite::SqliteConnectOptions;
 use subtle::ConstantTimeEq;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
@@ -82,9 +85,11 @@ pub async fn run_app(tracker: &TaskTracker) -> Result<(), FatalError> {
 
 /// Initializes the database pool.
 async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> {
+    let options = SqliteConnectOptions::from_str(config.database.url.as_str())?.foreign_keys(true);
+
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .acquire_timeout(config.database.timeout)
-        .connect(config.database.url.as_str())
+        .connect_with(options)
         .await?;
 
     sqlx::migrate!().run(&pool).await?;
