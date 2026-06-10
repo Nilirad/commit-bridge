@@ -64,12 +64,12 @@ pub mod trigger;
 type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 
 /// Runs the server, delegating errors to the caller.
-pub async fn run_app(tracker: &TaskTracker) -> Result<(), FatalError> {
+pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result<(), FatalError> {
     let config = Config::load()?;
     let pool = init_database(&config).await?;
     let http_client = build_http_client(&config)?;
 
-    let ctx = init_context(pool.clone(), config.clone());
+    let ctx = init_context(pool.clone(), config.clone(), token.clone());
 
     crate::trigger::recover_stuck_tasks(&pool, &config).await?;
 
@@ -80,7 +80,7 @@ pub async fn run_app(tracker: &TaskTracker) -> Result<(), FatalError> {
 
     let app = build_router(pool, &config);
 
-    run_server(app, ctx.token.clone(), &ctx.config).await
+    run_server(app, &ctx.config).await
 }
 
 /// Initializes the database pool.
@@ -98,10 +98,9 @@ async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> 
 }
 
 /// Initializes the shared application context.
-fn init_context(pool: sqlx::SqlitePool, config: Config) -> SharedContext {
-    let token = CancellationToken::new();
+fn init_context(pool: sqlx::SqlitePool, config: Config, token: CancellationToken) -> SharedContext {
     SharedContext {
-        config: config.clone(),
+        config,
         db_pool: pool,
         token,
         git_fetcher: std::sync::Arc::new(crate::polling::git::MainGitFetcher),
@@ -231,11 +230,7 @@ pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
 }
 
 /// Runs the server.
-async fn run_server(
-    app: Router,
-    token: CancellationToken,
-    config: &Config,
-) -> Result<(), FatalError> {
+async fn run_server(app: Router, config: &Config) -> Result<(), FatalError> {
     let listener = tokio::net::TcpListener::bind(config.server.address)
         .await
         .map_err(FatalError::TcpBinding)?;
@@ -249,8 +244,6 @@ async fn run_server(
         .with_graceful_shutdown(shutdown_signal())
         .await
         .map_err(FatalError::Serve)?;
-
-    token.cancel();
 
     Ok(())
 }
