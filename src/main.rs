@@ -9,7 +9,7 @@
 )]
 
 use relay::run_app;
-use tokio_util::task::TaskTracker;
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
 #[tokio::main]
@@ -20,9 +20,13 @@ async fn main() {
     tracing::warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
 
     let tracker = TaskTracker::new();
+    let token = CancellationToken::new();
 
-    run_app(&tracker).await.unwrap_or_else(|e| error!("{e}"));
+    run_app(&tracker, &token)
+        .await
+        .unwrap_or_else(|e| error!("{e}"));
 
+    token.cancel();
     tracker.close();
     tracker.wait().await;
     info!("All systems terminated. Terminating process.")
