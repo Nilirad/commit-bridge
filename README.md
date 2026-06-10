@@ -115,7 +115,7 @@ is correctly mapped in `docker-compose.yaml`,
 then build and start the container:
 
 ```shell
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Nix flake

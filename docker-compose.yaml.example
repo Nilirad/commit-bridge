@@ -13,6 +13,14 @@ services:
       - ./YOUR_PEM_FILE.pem:/app/data/YOUR_PEM_FILE.pem:ro
     env_file:
       - .env
+    develop:
+      watch:
+        - action: rebuild
+          path: src/
+        - action: rebuild
+          path: Cargo.toml
+        - action: rebuild
+          path: Cargo.lock
 
 volumes:
   relay_data:

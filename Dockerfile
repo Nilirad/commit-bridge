@@ -1,9 +1,19 @@
-FROM rust:1.96-slim-bookworm AS builder
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
+FROM rust:1.96-slim-bookworm AS chef
+RUN apt-get update && apt-get install -y pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN cargo install --locked cargo-chef
 WORKDIR /app
+
+FROM chef AS planner
 COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
 ENV SQLX_OFFLINE=true
-RUN cargo build --release
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY . .
+RUN cargo build --release --bin relay
 
 FROM debian:bookworm-slim AS final
 RUN apt-get update && apt-get install -y --no-install-recommends \
