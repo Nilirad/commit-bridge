@@ -25,7 +25,7 @@ impl GitFetcher for MainGitFetcher {
         branch: &str,
     ) -> Result<CommitHash, CommitHashError> {
         tokio::process::Command::new("git")
-            .args(["ls-remote", repo_url, branch])
+            .args(["ls-remote", "--", repo_url, branch])
             .output()
             .await
             .map_err(CommitHashError::from)
