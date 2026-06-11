@@ -270,12 +270,16 @@ async fn get_or_insert_branch_id(
         return Ok(id);
     }
 
-    sqlx::query_scalar::<_, i64>("INSERT INTO branches (repo_url, name) VALUES (?, ?) RETURNING id")
-        .bind(&payload.source_repo_url)
-        .bind(&payload.source_branch_name)
-        .fetch_one(&mut *transaction)
-        .await
-        .map_err(Into::into)
+    sqlx::query_scalar::<_, i64>(
+        "INSERT INTO branches (repo_url, name) VALUES (?, ?) \
+         ON CONFLICT(repo_url, name) DO UPDATE SET repo_url=excluded.repo_url \
+         RETURNING id",
+    )
+    .bind(&payload.source_repo_url)
+    .bind(&payload.source_branch_name)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(Into::into)
 }
 
 #[cfg(test)]
