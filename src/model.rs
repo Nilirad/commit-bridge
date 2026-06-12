@@ -97,7 +97,7 @@ pub struct SubscriberHal {
 }
 
 /// Holds payload data for the creation of a [`Subscriber`].
-#[derive(Debug, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct CreateSubscriber {
     /// Determines the value of [`Branch::repo_url`].
     pub source_repo_url: RepoUrl,

@@ -241,14 +241,37 @@ async fn delete_subscriber_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<(), HandlerError> {
-    let result = sqlx::query("DELETE FROM subscribers WHERE id = ?")
+    let mut transaction = state.db_pool.begin().await?;
+
+    let branch_id: i64 = sqlx::query_scalar("SELECT branch_id FROM subscribers WHERE id = ?")
         .bind(id)
-        .execute(&state.db_pool)
+        .fetch_optional(&mut *transaction)
+        .await?
+        .ok_or(HandlerError::NotFound)?;
+
+    let delete_subscriber_result = sqlx::query("DELETE FROM subscribers WHERE id = ?")
+        .bind(id)
+        .execute(&mut *transaction)
         .await?;
 
-    if result.rows_affected() == 0 {
+    if delete_subscriber_result.rows_affected() == 0 {
         return Err(HandlerError::NotFound);
     }
+
+    let remaining_subscribers: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM subscribers WHERE branch_id = ?")
+            .bind(branch_id)
+            .fetch_one(&mut *transaction)
+            .await?;
+
+    if remaining_subscribers == 0 {
+        sqlx::query("DELETE FROM branches WHERE id = ?")
+            .bind(branch_id)
+            .execute(&mut *transaction)
+            .await?;
+    }
+
+    transaction.commit().await?;
     Ok(())
 }
 
@@ -359,5 +382,67 @@ mod tests {
         // Verify delete
         let get_after_delete = get_subscriber_inner(State(state.clone()), Path(id)).await;
         assert!(get_after_delete.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_cascading_branch_cleanup() {
+        let pool = create_test_db().await;
+        let state = AppState {
+            db_pool: pool.clone(),
+            api_key: None,
+            allow_unauthenticated: false,
+        };
+        let payload = CreateSubscriber {
+            source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),
+            source_branch_name: BranchName::new("main".to_string()).unwrap(),
+            target_repo: TargetRepo::new("org/target".to_string()).unwrap(),
+            event_type: EventType::new("dispatch".to_string()).unwrap(),
+            gh_app_installation_id: 1,
+        };
+
+        // Create two subscribers for the same branch
+        let sub1 = create_subscriber_inner(State(state.clone()), Json(payload.clone()))
+            .await
+            .unwrap();
+        let sub2 = create_subscriber_inner(State(state.clone()), Json(payload))
+            .await
+            .unwrap();
+
+        let branch_id = sub1.subscriber.branch_id;
+
+        // Verify branch exists
+        let branch: Option<(i64,)> = sqlx::query_as("SELECT id FROM branches WHERE id = ?")
+            .bind(branch_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+        assert!(branch.is_some());
+
+        // Delete first subscriber
+        delete_subscriber_inner(State(state.clone()), Path(sub1.subscriber.id))
+            .await
+            .unwrap();
+
+        // Branch should still exist
+        let branch_still_exists: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM branches WHERE id = ?")
+                .bind(branch_id)
+                .fetch_optional(&pool)
+                .await
+                .unwrap();
+        assert!(branch_still_exists.is_some());
+
+        // Delete second subscriber
+        delete_subscriber_inner(State(state.clone()), Path(sub2.subscriber.id))
+            .await
+            .unwrap();
+
+        // Branch should be gone
+        let branch_gone: Option<(i64,)> = sqlx::query_as("SELECT id FROM branches WHERE id = ?")
+            .bind(branch_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+        assert!(branch_gone.is_none());
     }
 }
