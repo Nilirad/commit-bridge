@@ -227,8 +227,8 @@ pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
         .with_scalar("/scalar")
         .with_state(state.clone())
         .finish()
-        .layer(middleware::from_fn(set_no_cache_header))
         .layer(middleware::from_fn_with_state(state, auth_middleware))
+        .layer(middleware::from_fn(set_no_cache_header))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             config.server.in_request_timeout,
