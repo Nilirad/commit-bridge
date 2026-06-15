@@ -198,6 +198,7 @@ mod health_handler {
 /// Builds the application router.
 pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
     let state = AppState {
+        config: std::sync::Arc::new(config.clone()),
         db_pool: pool,
         api_key: config.auth.api_key.clone(),
         allow_unauthenticated: config.auth.allow_unauthenticated,

@@ -5,15 +5,17 @@
 
 use crate::error::HandlerError;
 use crate::model::{
-    CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, UpdateSubscriber,
+    CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, SubscriberPage,
+    SubscriberPageLinks, UpdateSubscriber,
 };
 
 use crate::state::AppState;
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
 };
 use rovo::rovo;
+use serde::Deserialize;
 use tracing::info;
 
 /// Maps a [`Subscriber`] to its HAL representation.
@@ -78,13 +80,27 @@ async fn create_subscriber_inner(
     Ok(Json(map_to_hal(subscriber)))
 }
 
+/// Query parameters for listing subscribers.
+#[derive(Debug, Deserialize, rovo::schemars::JsonSchema)]
+pub struct ListSubscribersQuery {
+    /// Maximum number of subscribers to return.
+    pub limit: Option<usize>,
+    /// The ID of the last subscriber in the previous page.
+    pub last_id: Option<i64>,
+}
+
 /// List all subscribers.
 ///
 /// Returns a list of all subscriber mappings in the system.
 ///
+/// # Query Parameters
+///
+/// - `limit`: The maximum number of subscribers to return (default: 50, max: 100).
+/// - `last_id`: The ID of the last subscriber in the previous page.
+///
 /// # Responses
 ///
-/// 200: Json<Vec<SubscriberHal>> - List of all subscribers
+/// 200: Json<SubscriberPage> - Paginated list of subscribers
 ///
 /// # Metadata
 ///
@@ -93,18 +109,47 @@ async fn create_subscriber_inner(
 #[rovo]
 pub async fn list_subscribers(
     state: State<AppState>,
-) -> Result<Json<Vec<SubscriberHal>>, HandlerError> {
-    list_subscribers_inner(state).await
+    query: Query<ListSubscribersQuery>,
+) -> Result<Json<SubscriberPage>, HandlerError> {
+    list_subscribers_inner(state, query).await
 }
 
 /// Internal implementation of [`list_subscribers`].
 async fn list_subscribers_inner(
     State(state): State<AppState>,
-) -> Result<Json<Vec<SubscriberHal>>, HandlerError> {
-    let subscribers = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers")
-        .fetch_all(&state.db_pool)
+    Query(query): Query<ListSubscribersQuery>,
+) -> Result<Json<SubscriberPage>, HandlerError> {
+    let limit = query
+        .limit
+        .unwrap_or(state.config.database.subscribers_list_limit)
+        .min(state.config.database.subscribers_list_limit_cap);
+    let last_id = query.last_id.unwrap_or_default();
+
+    let subscribers = sqlx::query_as::<_, Subscriber>(
+        "SELECT * FROM subscribers WHERE id > ? ORDER BY id ASC LIMIT ?",
+    )
+    .bind(last_id)
+    .bind(limit as i64)
+    .fetch_all(&state.db_pool)
+    .await?;
+
+    let remaining_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM subscribers WHERE id > ?")
+        .bind(subscribers.last().map(|s| s.id).unwrap_or(last_id))
+        .fetch_one(&state.db_pool)
         .await?;
-    Ok(Json(subscribers.into_iter().map(map_to_hal).collect()))
+
+    let next_link = subscribers
+        .last()
+        .filter(|_| remaining_count > 0)
+        .map(|s| HalLink {
+            href: format!("/subscribers?limit={}&last_id={}", limit, s.id),
+        });
+
+    Ok(Json(SubscriberPage {
+        data: subscribers.into_iter().map(map_to_hal).collect(),
+        remaining_count,
+        links: SubscriberPageLinks { next: next_link },
+    }))
 }
 
 /// Get a single subscriber.
@@ -326,7 +371,9 @@ mod tests {
     #[tokio::test]
     async fn test_crud_subscriber() {
         let pool = create_test_db().await;
+        let config = crate::test_utils::create_test_config();
         let state = AppState {
+            config: std::sync::Arc::new(config),
             db_pool: pool.clone(),
             api_key: None,
             allow_unauthenticated: false,
@@ -347,9 +394,21 @@ mod tests {
         assert_eq!(res.links.self_link.href, format!("/subscribers/{}", id));
 
         // List
-        let list = list_subscribers_inner(State(state.clone())).await.unwrap();
-        assert_eq!(list.len(), 1);
-        assert_eq!(list[0].links.self_link.href, format!("/subscribers/{}", id));
+        let list = list_subscribers_inner(
+            State(state.clone()),
+            Query(ListSubscribersQuery {
+                limit: None,
+                last_id: None,
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(list.data.len(), 1);
+        assert_eq!(
+            list.data[0].links.self_link.href,
+            format!("/subscribers/{}", id)
+        );
+        assert_eq!(list.remaining_count, 0);
 
         // Get
         let get = get_subscriber_inner(State(state.clone()), Path(id))
@@ -385,9 +444,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_list_subscribers_pagination() {
+        let pool = create_test_db().await;
+        let config = crate::test_utils::create_test_config();
+        let state = AppState {
+            config: std::sync::Arc::new(config),
+            db_pool: pool.clone(),
+            api_key: None,
+            allow_unauthenticated: false,
+        };
+
+        // Create 3 subscribers
+        for i in 0..3 {
+            let payload = CreateSubscriber {
+                source_repo_url: RepoUrl::new(format!("https://github.com/org/repo{}", i)).unwrap(),
+                source_branch_name: BranchName::new("main".to_string()).unwrap(),
+                target_repo: TargetRepo::new("org/target".to_string()).unwrap(),
+                event_type: EventType::new("dispatch".to_string()).unwrap(),
+                gh_app_installation_id: 1,
+            };
+            let _ = create_subscriber_inner(State(state.clone()), Json(payload))
+                .await
+                .unwrap();
+        }
+
+        // Fetch first page (limit 2)
+        let page1 = list_subscribers_inner(
+            State(state.clone()),
+            Query(ListSubscribersQuery {
+                limit: Some(2),
+                last_id: None,
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(page1.data.len(), 2);
+        assert_eq!(page1.remaining_count, 1);
+        assert!(page1.links.next.is_some());
+
+        // Fetch second page
+        let last_id = page1.data.last().unwrap().subscriber.id;
+        let page2 = list_subscribers_inner(
+            State(state.clone()),
+            Query(ListSubscribersQuery {
+                limit: Some(2),
+                last_id: Some(last_id),
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(page2.data.len(), 1);
+        assert_eq!(page2.remaining_count, 0);
+        assert!(page2.links.next.is_none());
+    }
+
+    #[tokio::test]
     async fn test_cascading_branch_cleanup() {
         let pool = create_test_db().await;
+        let config = crate::test_utils::create_test_config();
         let state = AppState {
+            config: std::sync::Arc::new(config),
             db_pool: pool.clone(),
             api_key: None,
             allow_unauthenticated: false,

@@ -66,6 +66,25 @@ pub struct Subscriber {
     pub updated_at: DateTime<Utc>,
 }
 
+/// HAL links for a subscriber page.
+#[derive(Serialize, JsonSchema)]
+pub struct SubscriberPageLinks {
+    /// Next page link.
+    pub next: Option<HalLink>,
+}
+
+/// Paginated representation of subscribers.
+#[derive(Serialize, JsonSchema)]
+pub struct SubscriberPage {
+    /// The subscriber data.
+    pub data: Vec<SubscriberHal>,
+    /// Number of elements remaining after this page.
+    pub remaining_count: i64,
+    /// HAL links.
+    #[serde(rename = "_links")]
+    pub links: SubscriberPageLinks,
+}
+
 /// HAL link structure.
 #[derive(Serialize, JsonSchema)]
 pub struct HalLink {
