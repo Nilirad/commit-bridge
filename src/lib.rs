@@ -82,7 +82,7 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
 
     let app = build_router(pool, &config);
 
-    run_server(app, &ctx.config).await
+    run_server(app, &ctx.config, token.clone()).await
 }
 
 /// Initializes the database pool.
@@ -237,7 +237,11 @@ pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
 }
 
 /// Runs the server.
-async fn run_server(app: Router, config: &Config) -> Result<(), FatalError> {
+async fn run_server(
+    app: Router,
+    config: &Config,
+    token: CancellationToken,
+) -> Result<(), FatalError> {
     let listener = tokio::net::TcpListener::bind(config.server.address)
         .await
         .map_err(FatalError::TcpBinding)?;
@@ -248,7 +252,7 @@ async fn run_server(app: Router, config: &Config) -> Result<(), FatalError> {
     );
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(token))
         .await
         .map_err(FatalError::Serve)?;
 
@@ -256,7 +260,7 @@ async fn run_server(app: Router, config: &Config) -> Result<(), FatalError> {
 }
 
 /// Creates a future that resolves when a termination signal is received.
-async fn shutdown_signal() {
+async fn shutdown_signal(token: CancellationToken) {
     let ctrl_c = signal::ctrl_c();
 
     #[cfg(unix)]
@@ -274,6 +278,7 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+        _ = token.cancelled() => {},
     }
     info!("Shutdown signal received, initiating graceful shutdown...");
 }
