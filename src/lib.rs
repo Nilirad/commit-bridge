@@ -142,12 +142,12 @@ async fn auth_middleware(
     next: Next,
 ) -> Response<Body> {
     let needs_authentication =
-        req.uri().path().starts_with("/subscribers") && !state.allow_unauthenticated;
+        req.uri().path().starts_with("/subscribers") && !state.config.auth.allow_unauthenticated;
 
     if needs_authentication {
         let auth_header = req.headers().get("X-API-KEY").and_then(|v| v.to_str().ok());
 
-        if !verify_api_key(state.api_key.as_ref(), auth_header) {
+        if !verify_api_key(state.config.auth.api_key.as_ref(), auth_header) {
             return StatusCode::UNAUTHORIZED.into_response();
         }
     }
@@ -202,8 +202,6 @@ pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
     let state = AppState {
         config: std::sync::Arc::new(config.clone()),
         db_pool: pool,
-        api_key: config.auth.api_key.clone(),
-        allow_unauthenticated: config.auth.allow_unauthenticated,
     };
 
     let mut api = OpenApi::default();
