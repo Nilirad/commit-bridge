@@ -117,6 +117,8 @@ pub struct DatabaseConfig {
     pub subscribers_list_limit_cap: usize,
 }
 
+/// Validates that the default pagination limit (`subscribers_list_limit`)
+/// does not exceed the maximum allowed cap (`subscribers_list_limit_cap`).
 fn validate_pagination_limits(config: &DatabaseConfig) -> Result<(), validator::ValidationError> {
     if config.subscribers_list_limit > config.subscribers_list_limit_cap {
         return Err(validator::ValidationError::new("limit_exceeds_cap"));
