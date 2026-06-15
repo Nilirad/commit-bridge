@@ -87,7 +87,9 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
 
 /// Initializes the database pool.
 async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> {
-    let options = SqliteConnectOptions::from_str(config.database.url.as_str())?.foreign_keys(true);
+    let options = SqliteConnectOptions::from_str(config.database.url.as_str())?
+        .foreign_keys(true)
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
 
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .acquire_timeout(config.database.timeout)
