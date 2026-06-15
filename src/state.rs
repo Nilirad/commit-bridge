@@ -1,6 +1,8 @@
 //! State of the application.
 
+use crate::config::Config;
 use crate::domain::NonEmptyString;
+use std::sync::Arc;
 
 /// Holds data accessible from each [handler].
 ///
@@ -8,6 +10,9 @@ use crate::domain::NonEmptyString;
 /// [handler]: crate::handler
 #[derive(Debug, Clone)]
 pub struct AppState {
+    /// Application configuration.
+    pub config: Arc<Config>,
+
     /// SQLx connection pool for the SQLite database.
     pub db_pool: sqlx::SqlitePool,
 

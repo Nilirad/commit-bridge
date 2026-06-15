@@ -10,7 +10,7 @@ use crate::domain::{AcceptHeader, ApiVersion, NonEmptyString};
 use crate::error::FatalError;
 
 /// Holds all application-wide configuration settings.
-#[derive(Clone, Deserialize, Validate)]
+#[derive(Clone, Debug, Deserialize, Validate)]
 pub struct Config {
     /// Server-related configuration settings.
     #[validate(nested)]
@@ -72,7 +72,7 @@ impl Config {
 }
 
 /// Configuration for the HTTP server.
-#[derive(Clone, Deserialize, Validate)]
+#[derive(Clone, Debug, Deserialize, Validate)]
 pub struct ServerConfig {
     /// The bind address for the server.
     pub address: SocketAddr,
@@ -90,7 +90,8 @@ pub struct ServerConfig {
 }
 
 /// Configuration for the database connection.
-#[derive(Clone, Deserialize, Validate)]
+#[derive(Clone, Debug, Deserialize, Validate)]
+#[validate(schema(function = "validate_pagination_limits"))]
 pub struct DatabaseConfig {
     /// The connection URL for the database.
     pub url: Url,
@@ -106,10 +107,25 @@ pub struct DatabaseConfig {
     /// The cooldown duration for polling database errors.
     #[serde(with = "humantime_serde")]
     pub polling_db_error_cooldown: Duration,
+
+    /// The default limit for subscribers list pagination.
+    #[validate(range(min = 1))]
+    pub subscribers_list_limit: usize,
+
+    /// The maximum allowed limit for subscribers list pagination.
+    #[validate(range(min = 1))]
+    pub subscribers_list_limit_cap: usize,
+}
+
+fn validate_pagination_limits(config: &DatabaseConfig) -> Result<(), validator::ValidationError> {
+    if config.subscribers_list_limit > config.subscribers_list_limit_cap {
+        return Err(validator::ValidationError::new("limit_exceeds_cap"));
+    }
+    Ok(())
 }
 
 /// Configuration for GitHub API interactions.
-#[derive(Clone, Deserialize, Validate)]
+#[derive(Clone, Debug, Deserialize, Validate)]
 pub struct GitHubApiConfig {
     /// The base URL for the GitHub API.
     pub base_url: Url,
@@ -122,7 +138,7 @@ pub struct GitHubApiConfig {
 }
 
 /// Configuration for internal engine processes.
-#[derive(Clone, Deserialize, Validate)]
+#[derive(Clone, Debug, Deserialize, Validate)]
 pub struct EngineConfig {
     /// Duration to sleep between polling cycles.
     #[serde(with = "humantime_serde")]
@@ -146,7 +162,7 @@ pub struct EngineConfig {
 }
 
 /// Configuration for authentication mechanisms.
-#[derive(Clone, Deserialize, Validate)]
+#[derive(Clone, Debug, Deserialize, Validate)]
 pub struct AuthConfig {
     /// Buffer time allowed for clock drift.
     #[serde(with = "humantime_serde")]
