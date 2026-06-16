@@ -163,9 +163,15 @@ pub struct TriggerQueueItem {
     pub target_repo: TargetRepo,
 
     /// Identifies the specific [`repository_dispatch`] event.
+    ///
+    /// <!-- LINKS -->
+    /// [`repository_dispatch`]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch
     pub event_type: EventType,
 
     /// Allows authenticating as a [GitHub App installation][gh_app_auth].
+    ///
+    /// <!-- LINKS -->
+    /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
     pub gh_app_installation_id: i64,
 
     /// Number of times the task has been attempted.
