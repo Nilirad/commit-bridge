@@ -159,6 +159,15 @@ pub struct TriggerQueueItem {
     /// The hash of the latest commit on the branch.
     pub new_hash: CommitHash,
 
+    /// The repository whose workflow needs to be triggered.
+    pub target_repo: TargetRepo,
+
+    /// Identifies the specific [`repository_dispatch`] event.
+    pub event_type: EventType,
+
+    /// Allows authenticating as a [GitHub App installation][gh_app_auth].
+    pub gh_app_installation_id: i64,
+
     /// Number of times the task has been attempted.
     pub retry_count: i64,
 }

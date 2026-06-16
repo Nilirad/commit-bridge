@@ -66,9 +66,15 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
         );
 
         sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash) VALUES (?, ?)",
+            "INSERT INTO trigger_queue (branch_id, new_hash, target_repo, event_type, gh_app_installation_id)
+             SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id
+             FROM subscribers s
+             WHERE s.branch_id = ?
+             ON CONFLICT(branch_id, target_repo, event_type) WHERE status = 'PENDING'
+             DO UPDATE SET new_hash = excluded.new_hash, status_updated_at = CURRENT_TIMESTAMP",
             branch_info.branch.id,
-            branch_info.latest_hash
+            branch_info.latest_hash,
+            branch_info.branch.id
         )
         .execute(&mut *transaction)
         .await?;
@@ -91,6 +97,13 @@ async fn followup_poll(res: Result<(), PollingError>, ctx: &SharedContext) {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::panic,
+    clippy::expect_used,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
 mod tests {
     use crate::context::SharedContext;
     use crate::domain::CommitHash;
@@ -108,6 +121,15 @@ mod tests {
             .bind("https://github.com/owner/repo")
             .bind("main")
             .bind("a".repeat(40))
+            .execute(&pool)
+            .await
+            .unwrap();
+        // Insert a subscriber
+        sqlx::query("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)")
+            .bind(1)
+            .bind("org/target")
+            .bind("dispatch")
+            .bind(1)
             .execute(&pool)
             .await
             .unwrap();
@@ -140,5 +162,63 @@ mod tests {
 
         assert_eq!(queued_event.branch_id, Some(1));
         assert_eq!(queued_event.new_hash, Some("b".repeat(40)));
+    }
+
+    #[tokio::test]
+    async fn test_coalescing_of_trigger_events() {
+        let pool = crate::test_utils::create_test_db().await;
+
+        // Insert a branch
+        sqlx::query("INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)")
+            .bind("https://github.com/owner/repo")
+            .bind("main")
+            .bind("a".repeat(40))
+            .execute(&pool)
+            .await
+            .unwrap();
+        // Insert a subscriber
+        sqlx::query("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)")
+            .bind(1)
+            .bind("org/target")
+            .bind("dispatch")
+            .bind(1)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let ctx = SharedContext {
+            config: crate::test_utils::create_test_config(),
+            db_pool: pool.clone(),
+            git_fetcher: Arc::new(crate::test_utils::MockGitFetcher {
+                hash: CommitHash::new("b".repeat(40)).unwrap(),
+            }),
+            token: CancellationToken::new(),
+        };
+
+        // First update
+        poll_branches(&ctx).await.unwrap();
+
+        // Second update (coalescing)
+        // Manually update the mock fetcher to a new hash
+        let mock_fetcher = Arc::new(crate::test_utils::MockGitFetcher {
+            hash: CommitHash::new("c".repeat(40)).unwrap(),
+        });
+        let ctx = SharedContext {
+            config: ctx.config,
+            db_pool: pool.clone(),
+            git_fetcher: mock_fetcher,
+            token: ctx.token,
+        };
+        poll_branches(&ctx).await.unwrap();
+
+        // Verify only one entry in queue
+        let queued_events = sqlx::query!("SELECT branch_id, new_hash FROM trigger_queue")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(queued_events.len(), 1);
+        assert_eq!(queued_events[0].branch_id, Some(1));
+        assert_eq!(queued_events[0].new_hash, Some("c".repeat(40)));
     }
 }
