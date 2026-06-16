@@ -77,7 +77,7 @@ async fn get_oldest_queued_trigger(
     pool: &SqlitePool,
 ) -> Result<Option<TriggerQueueItem>, sqlx::Error> {
     let trigger = sqlx::query_as::<_, TriggerQueueItem>(
-        "SELECT id, branch_id, new_hash, retry_count FROM trigger_queue
+        "SELECT id, branch_id, new_hash, retry_count, target_repo, event_type, gh_app_installation_id FROM trigger_queue
          WHERE status IN ('PENDING') AND next_retry_at <= CURRENT_TIMESTAMP
          ORDER BY next_retry_at ASC LIMIT 1",
     )
@@ -179,31 +179,23 @@ pub async fn dispatch_events(
         trigger.branch_id, trigger.new_hash
     );
 
-    let subscribers = get_subscribers(&engine.ctx.db_pool, trigger).await?;
+    let sub = Subscriber {
+        id: 0, // Not needed
+        branch_id: trigger.branch_id,
+        target_repo: trigger.target_repo.clone(),
+        event_type: trigger.event_type.clone(),
+        gh_app_installation_id: trigger.gh_app_installation_id,
+        created_at: chrono::Utc::now(), // Not needed
+        updated_at: chrono::Utc::now(), // Not needed
+    };
 
-    for sub in subscribers {
-        let iat = engine
-            .authenticator
-            .request_installation_token(&sub)
-            .await?;
-        notify_subscriber(engine, iat, trigger, sub).await?;
-    }
+    let iat = engine
+        .authenticator
+        .request_installation_token(&sub)
+        .await?;
+    notify_subscriber(engine, iat, trigger, sub).await?;
 
     Ok(())
-}
-
-/// Gets all the [`Subscriber`]s subscribed to the branch update.
-async fn get_subscribers(
-    pool: &SqlitePool,
-    trigger: &TriggerQueueItem,
-) -> Result<Vec<Subscriber>, WorkflowTriggerError> {
-    let subscribers =
-        sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers WHERE branch_id = ?")
-            .bind(trigger.branch_id)
-            .fetch_all(pool)
-            .await?;
-
-    Ok(subscribers)
 }
 
 /// Manages IAT authentication,
@@ -288,7 +280,7 @@ mod tests {
     )]
 
     use super::*;
-    use crate::domain::CommitHash;
+    use crate::domain::{CommitHash, EventType, TargetRepo};
     use crate::test_utils::{MockAuthenticator, MockGitFetcher};
     use std::sync::Arc;
 
@@ -316,11 +308,14 @@ mod tests {
         .unwrap();
         // 2. Processing (recent)
         sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, status_updated_at) VALUES (?, ?, ?, ?, DATETIME('now', '-1 minute'))",
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?)",
             1,
             hash,
             "PROCESSING",
-            0
+            0,
+            "org/repo",
+            "event",
+            1
         )
         .execute(&pool)
         .await
@@ -359,33 +354,42 @@ mod tests {
         // Insert some dummy items
         let hash = "a".repeat(40);
         sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '-1 minute'))",
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?, datetime('now', '-1 minute'), ?, ?, ?)",
             1,
             hash,
             "PENDING",
-            0
+            0,
+            "org/repo1",
+            "event",
+            1
         )
         .execute(&pool)
         .await
         .unwrap();
         let hash = "a".repeat(40);
         sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '-5 minutes'))",
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?, datetime('now', '-5 minutes'), ?, ?, ?)",
             1,
             hash,
             "PENDING",
-            0
+            0,
+            "org/repo2",
+            "event",
+            1
         )
         .execute(&pool)
         .await
         .unwrap();
         let hash = "a".repeat(40);
         sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, datetime('now', '+1 minute'))",
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?, datetime('now', '+1 minute'), ?, ?, ?)",
             1,
             hash,
             "PENDING",
-            0
+            0,
+            "org/repo3",
+            "event",
+            1
         )
         .execute(&pool)
         .await
@@ -425,6 +429,9 @@ mod tests {
             branch_id: 1,
             new_hash: CommitHash::new("a".repeat(40)).expect("valid commit hash"),
             retry_count: 0,
+            target_repo: TargetRepo::new("org/repo".to_string()).unwrap(),
+            event_type: EventType::new("event".to_string()).unwrap(),
+            gh_app_installation_id: 1,
         };
 
         let engine = TriggerEngine {
@@ -498,11 +505,14 @@ mod tests {
 
         let hash = "a".repeat(40);
         sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at) VALUES (?, ?, ?, ?, '2000-01-01 00:00:00')",
+            "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?, '2000-01-01 00:00:00', ?, ?, ?)",
             1,
             hash,
             "PENDING",
-            0
+            0,
+            "org/target",
+            "dispatch",
+            1
         )
         .execute(&pool)
         .await

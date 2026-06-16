@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO trigger_queue (branch_id, new_hash, status, retry_count, next_retry_at, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?, datetime('now', '-1 minute'), ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "090de72845fe6d5a026cb2d1674b19a3b633f4d1de51543ff030023c19e03500"
+}
