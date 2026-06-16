@@ -71,6 +71,14 @@ impl Config {
     }
 }
 
+/// Validates that a duration is positive.
+fn validate_duration_positive(duration: &Duration) -> Result<(), validator::ValidationError> {
+    if duration.is_zero() {
+        return Err(validator::ValidationError::new("duration_must_be_positive"));
+    }
+    Ok(())
+}
+
 /// Configuration for the HTTP server.
 #[derive(Clone, Debug, Deserialize, Validate)]
 pub struct ServerConfig {
@@ -82,10 +90,12 @@ pub struct ServerConfig {
 
     /// Timeout duration for incoming HTTP requests.
     #[serde(with = "humantime_serde")]
+    #[validate(custom(function = "validate_duration_positive"))]
     pub in_request_timeout: Duration,
 
     /// Timeout duration for outgoing HTTP requests.
     #[serde(with = "humantime_serde")]
+    #[validate(custom(function = "validate_duration_positive"))]
     pub out_request_timeout: Duration,
 }
 
@@ -139,8 +149,19 @@ pub struct GitHubApiConfig {
     pub accept_header: AcceptHeader,
 }
 
+/// Validates that the stuck task threshold is greater than the polling interval.
+fn validate_engine_config(config: &EngineConfig) -> Result<(), validator::ValidationError> {
+    if config.stuck_task_threshold <= config.trigger_queue_polling_interval {
+        return Err(validator::ValidationError::new(
+            "stuck_task_threshold_too_low",
+        ));
+    }
+    Ok(())
+}
+
 /// Configuration for internal engine processes.
 #[derive(Clone, Debug, Deserialize, Validate)]
+#[validate(schema(function = "validate_engine_config"))]
 pub struct EngineConfig {
     /// Duration to sleep between polling cycles.
     #[serde(with = "humantime_serde")]
@@ -163,8 +184,27 @@ pub struct EngineConfig {
     pub stuck_task_threshold: Duration,
 }
 
+/// Validates that an API key is provided if unauthenticated access is disabled,
+/// and that token validity exceeds the clock drift buffer.
+fn validate_auth_config(config: &AuthConfig) -> Result<(), validator::ValidationError> {
+    if !config.allow_unauthenticated && config.api_key.is_none() {
+        return Err(validator::ValidationError::new(
+            "api_key_required_when_auth_enabled",
+        ));
+    }
+
+    if config.token_validity <= config.clock_drift_buffer {
+        return Err(validator::ValidationError::new(
+            "token_validity_too_short_for_drift_buffer",
+        ));
+    }
+
+    Ok(())
+}
+
 /// Configuration for authentication mechanisms.
 #[derive(Clone, Debug, Deserialize, Validate)]
+#[validate(schema(function = "validate_auth_config"))]
 pub struct AuthConfig {
     /// Buffer time allowed for clock drift.
     #[serde(with = "humantime_serde")]
