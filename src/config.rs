@@ -163,8 +163,19 @@ pub struct EngineConfig {
     pub stuck_task_threshold: Duration,
 }
 
+/// Validates that an API key is provided if unauthenticated access is disabled.
+fn validate_auth_config(config: &AuthConfig) -> Result<(), validator::ValidationError> {
+    if !config.allow_unauthenticated && config.api_key.is_none() {
+        return Err(validator::ValidationError::new(
+            "api_key_required_when_auth_enabled",
+        ));
+    }
+    Ok(())
+}
+
 /// Configuration for authentication mechanisms.
 #[derive(Clone, Debug, Deserialize, Validate)]
+#[validate(schema(function = "validate_auth_config"))]
 pub struct AuthConfig {
     /// Buffer time allowed for clock drift.
     #[serde(with = "humantime_serde")]
