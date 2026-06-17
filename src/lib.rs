@@ -96,6 +96,7 @@ async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> 
         .connect_with(options)
         .await?;
 
+    // Ensures database schema is up to date in all environments.
     sqlx::migrate!().run(&pool).await?;
 
     Ok(pool)
