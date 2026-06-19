@@ -320,8 +320,9 @@ async fn delete_subscriber_inner(
     Ok(())
 }
 
-/// Gets the branch ID specified in the [`CreateSubscriber`] payload.
+/// Converts a reference to a git branch to its corresponding database ID.
 ///
+/// Attempts to get the branch ID specified in `payload`.
 /// If the branch doesn't exist, it is created and its ID is returned.
 async fn get_or_insert_branch_id(
     transaction: &mut sqlx::SqliteConnection,
