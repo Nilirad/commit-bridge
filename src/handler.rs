@@ -133,8 +133,9 @@ async fn list_subscribers_inner(
     .fetch_all(&state.db_pool)
     .await?;
 
+    let next_id = subscribers.last().map(|s| s.id).unwrap_or(last_id);
     let remaining_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM subscribers WHERE id > ?")
-        .bind(subscribers.last().map(|s| s.id).unwrap_or(last_id))
+        .bind(next_id)
         .fetch_one(&state.db_pool)
         .await?;
 
