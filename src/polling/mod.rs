@@ -117,19 +117,23 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
 
         // Insert a branch
-        sqlx::query("INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)")
-            .bind("https://github.com/owner/repo")
-            .bind("main")
-            .bind("a".repeat(40))
-            .execute(&pool)
-            .await
-            .unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)",
+            "https://github.com/owner/repo",
+            "main",
+            hash
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         // Insert a subscriber
-        sqlx::query("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)")
-            .bind(1)
-            .bind("org/target")
-            .bind("dispatch")
-            .bind(1)
+        sqlx::query!("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+            1,
+            "org/target",
+            "dispatch",
+            1
+        )
             .execute(&pool)
             .await
             .unwrap();
@@ -169,19 +173,23 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
 
         // Insert a branch
-        sqlx::query("INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)")
-            .bind("https://github.com/owner/repo")
-            .bind("main")
-            .bind("a".repeat(40))
-            .execute(&pool)
-            .await
-            .unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)",
+            "https://github.com/owner/repo",
+            "main",
+            hash
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         // Insert a subscriber
-        sqlx::query("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)")
-            .bind(1)
-            .bind("org/target")
-            .bind("dispatch")
-            .bind(1)
+        sqlx::query!("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+            1,
+            "org/target",
+            "dispatch",
+            1
+        )
             .execute(&pool)
             .await
             .unwrap();

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO branches (repo_url, name) VALUES (?, ?) ON CONFLICT(repo_url, name) DO UPDATE SET repo_url=excluded.repo_url RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0b4e1596515ebf1efe9b7dfdfe56a8aa4206150cb0568ca749c8e3f55dc82cdf"
+}

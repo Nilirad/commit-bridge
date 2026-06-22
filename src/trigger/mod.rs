@@ -157,13 +157,13 @@ pub async fn recover_stuck_tasks(pool: &SqlitePool, config: &Config) -> Result<(
     let threshold_seconds = config.engine.stuck_task_threshold.as_secs();
     let threshold_str = format!("-{} seconds", threshold_seconds);
 
-    sqlx::query(
+    sqlx::query!(
         "UPDATE trigger_queue
          SET status = 'PENDING', status_updated_at = CURRENT_TIMESTAMP
          WHERE status = 'PROCESSING'
            AND status_updated_at < DATETIME('now', ?)",
+        threshold_str
     )
-    .bind(threshold_str)
     .execute(pool)
     .await?;
     Ok(())
