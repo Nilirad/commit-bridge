@@ -134,10 +134,10 @@ async fn list_subscribers_inner(
     .await?;
 
     let next_id = subscribers.last().map(|s| s.id).unwrap_or(last_id);
-    let remaining_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM subscribers WHERE id > ?")
-        .bind(next_id)
-        .fetch_one(&state.db_pool)
-        .await?;
+    let remaining_count: i64 =
+        sqlx::query_scalar!("SELECT COUNT(*) FROM subscribers WHERE id > ?", next_id)
+            .fetch_one(&state.db_pool)
+            .await?;
 
     let next_link = subscribers
         .last()
@@ -289,14 +289,12 @@ async fn delete_subscriber_inner(
 ) -> Result<(), HandlerError> {
     let mut transaction = state.db_pool.begin().await?;
 
-    let branch_id: i64 = sqlx::query_scalar("SELECT branch_id FROM subscribers WHERE id = ?")
-        .bind(id)
+    let branch_id: i64 = sqlx::query_scalar!("SELECT branch_id FROM subscribers WHERE id = ?", id)
         .fetch_optional(&mut *transaction)
         .await?
         .ok_or(HandlerError::NotFound)?;
 
-    let delete_subscriber_result = sqlx::query("DELETE FROM subscribers WHERE id = ?")
-        .bind(id)
+    let delete_subscriber_result = sqlx::query!("DELETE FROM subscribers WHERE id = ?", id)
         .execute(&mut *transaction)
         .await?;
 
@@ -304,15 +302,15 @@ async fn delete_subscriber_inner(
         return Err(HandlerError::NotFound);
     }
 
-    let remaining_subscribers: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM subscribers WHERE branch_id = ?")
-            .bind(branch_id)
-            .fetch_one(&mut *transaction)
-            .await?;
+    let remaining_subscribers: i64 = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM subscribers WHERE branch_id = ?",
+        branch_id
+    )
+    .fetch_one(&mut *transaction)
+    .await?;
 
     if remaining_subscribers == 0 {
-        sqlx::query("DELETE FROM branches WHERE id = ?")
-            .bind(branch_id)
+        sqlx::query!("DELETE FROM branches WHERE id = ?", branch_id)
             .execute(&mut *transaction)
             .await?;
     }
