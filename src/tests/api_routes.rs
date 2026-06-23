@@ -1,8 +1,9 @@
-use crate::{build_router, test_utils::create_test_db};
+use crate::{build_router, repository::SqliteRepository, test_utils::create_test_db};
 use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use std::sync::Arc;
 use tower::ServiceExt; // for oneshot
 
 #[tokio::test]
@@ -10,8 +11,9 @@ async fn test_subscriber_api_routes() {
     let pool = create_test_db().await;
     let mut config = crate::test_utils::create_test_config();
     config.auth.allow_unauthenticated = true;
+    let repository = Arc::new(SqliteRepository::new(pool.clone()));
 
-    let app = build_router(pool, &config);
+    let app = build_router(repository, pool, &config);
 
     // Test List Subscribers (Empty)
     let response = app

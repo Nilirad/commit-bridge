@@ -1,5 +1,6 @@
 //! Definitions for common error types.
 
+use crate::repository::RepositoryError;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -153,4 +154,13 @@ pub enum CommitHashError {
         /// The relevant git branch.
         branch: String,
     },
+}
+
+impl From<RepositoryError> for HandlerError {
+    fn from(e: RepositoryError) -> Self {
+        match e {
+            RepositoryError::NotFound => HandlerError::NotFound,
+            RepositoryError::Database(e) => HandlerError::DbQuery(e),
+        }
+    }
 }

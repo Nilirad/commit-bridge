@@ -8,6 +8,7 @@ use crate::model::{
     CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, SubscriberPage,
     SubscriberPageLinks, UpdateSubscriber,
 };
+use crate::repository::subscriber::SubscriberRepository;
 
 use crate::state::AppState;
 use axum::{
@@ -62,20 +63,12 @@ async fn create_subscriber_inner(
     State(state): State<AppState>,
     Json(payload): Json<CreateSubscriber>,
 ) -> Result<Json<SubscriberHal>, HandlerError> {
-    let mut transaction = state.db_pool.begin().await?;
-    let branch_id = get_or_insert_branch_id(&mut transaction, &payload).await?;
-    let subscriber = sqlx::query_as::<_, Subscriber>(
-        "INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?) RETURNING *"
-    )
-    .bind(branch_id)
-    .bind(&payload.target_repo)
-    .bind(&payload.event_type)
-    .bind(payload.gh_app_installation_id)
-    .fetch_one(&mut *transaction)
-    .await?;
-    transaction.commit().await?;
+    let subscriber = state.repository.create(&payload).await?;
 
-    info!("Registered new subscriber for branch ID {branch_id}: {subscriber:?}");
+    info!(
+        "Registered new subscriber for branch ID {}: {:?}",
+        subscriber.branch_id, subscriber
+    );
 
     Ok(Json(map_to_hal(subscriber)))
 }
@@ -125,19 +118,13 @@ async fn list_subscribers_inner(
         .min(state.config.database.subscribers_list_limit_cap);
     let last_id = query.last_id.unwrap_or_default();
 
-    let subscribers = sqlx::query_as::<_, Subscriber>(
-        "SELECT * FROM subscribers WHERE id > ? ORDER BY id ASC LIMIT ?",
-    )
-    .bind(last_id)
-    .bind(limit as i64)
-    .fetch_all(&state.db_pool)
-    .await?;
+    let subscribers = state
+        .repository
+        .list_paginated(last_id, limit as i64)
+        .await?;
 
     let next_id = subscribers.last().map(|s| s.id).unwrap_or(last_id);
-    let remaining_count: i64 =
-        sqlx::query_scalar!("SELECT COUNT(*) FROM subscribers WHERE id > ?", next_id)
-            .fetch_one(&state.db_pool)
-            .await?;
+    let remaining_count = state.repository.count_remaining(next_id).await?;
 
     let next_link = subscribers
         .last()
@@ -183,9 +170,9 @@ async fn get_subscriber_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<SubscriberHal>, HandlerError> {
-    let subscriber = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers WHERE id = ?")
-        .bind(id)
-        .fetch_optional(&state.db_pool)
+    let subscriber = state
+        .repository
+        .get_by_id(id)
         .await?
         .ok_or(HandlerError::NotFound)?;
     Ok(Json(map_to_hal(subscriber)))
@@ -223,36 +210,7 @@ async fn update_subscriber_inner(
     Path(id): Path<i64>,
     Json(payload): Json<UpdateSubscriber>,
 ) -> Result<Json<SubscriberHal>, HandlerError> {
-    let mut query_builder = sqlx::QueryBuilder::new("UPDATE subscribers SET ");
-    let mut separated = query_builder.separated(", ");
-
-    if let Some(target_repo) = &payload.target_repo {
-        separated
-            .push("target_repo = ")
-            .push_bind_unseparated(target_repo);
-    }
-    if let Some(event_type) = &payload.event_type {
-        separated
-            .push("event_type = ")
-            .push_bind_unseparated(event_type);
-    }
-    if let Some(gh_app_installation_id) = payload.gh_app_installation_id {
-        separated
-            .push("gh_app_installation_id = ")
-            .push_bind_unseparated(gh_app_installation_id);
-    }
-
-    separated.push("updated_at = CURRENT_TIMESTAMP");
-
-    query_builder.push(" WHERE id = ");
-    query_builder.push_bind(id);
-    query_builder.push(" RETURNING *");
-
-    let subscriber = query_builder
-        .build_query_as::<Subscriber>()
-        .fetch_optional(&state.db_pool)
-        .await?
-        .ok_or(HandlerError::NotFound)?;
+    let subscriber = state.repository.update(id, &payload).await?;
 
     Ok(Json(map_to_hal(subscriber)))
 }
@@ -287,67 +245,23 @@ async fn delete_subscriber_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<(), HandlerError> {
-    let mut transaction = state.db_pool.begin().await?;
-
-    let branch_id: i64 = sqlx::query_scalar!("SELECT branch_id FROM subscribers WHERE id = ?", id)
-        .fetch_optional(&mut *transaction)
+    let branch_id = state
+        .repository
+        .get_branch_id_by_subscriber_id(id)
         .await?
         .ok_or(HandlerError::NotFound)?;
 
-    let delete_subscriber_result = sqlx::query!("DELETE FROM subscribers WHERE id = ?", id)
-        .execute(&mut *transaction)
+    state.repository.delete(id).await?;
+
+    let remaining_subscribers = state
+        .repository
+        .count_subscribers_by_branch_id(branch_id)
         .await?;
 
-    if delete_subscriber_result.rows_affected() == 0 {
-        return Err(HandlerError::NotFound);
-    }
-
-    let remaining_subscribers: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM subscribers WHERE branch_id = ?",
-        branch_id
-    )
-    .fetch_one(&mut *transaction)
-    .await?;
-
     if remaining_subscribers == 0 {
-        sqlx::query!("DELETE FROM branches WHERE id = ?", branch_id)
-            .execute(&mut *transaction)
-            .await?;
+        state.repository.delete_branch_by_id(branch_id).await?;
     }
-
-    transaction.commit().await?;
     Ok(())
-}
-
-/// Converts a reference to a git branch to its corresponding database ID.
-///
-/// Attempts to get the branch ID specified in `payload`.
-/// If the branch doesn't exist, it is created and its ID is returned.
-async fn get_or_insert_branch_id(
-    transaction: &mut sqlx::SqliteConnection,
-    payload: &CreateSubscriber,
-) -> Result<i64, HandlerError> {
-    let branch_id_opt =
-        sqlx::query_scalar::<_, i64>("SELECT id FROM branches WHERE repo_url = ? AND name = ?")
-            .bind(&payload.source_repo_url)
-            .bind(&payload.source_branch_name)
-            .fetch_optional(&mut *transaction)
-            .await?;
-
-    if let Some(id) = branch_id_opt {
-        return Ok(id);
-    }
-
-    sqlx::query_scalar::<_, i64>(
-        "INSERT INTO branches (repo_url, name) VALUES (?, ?) \
-         ON CONFLICT(repo_url, name) DO UPDATE SET repo_url=excluded.repo_url \
-         RETURNING id",
-    )
-    .bind(&payload.source_repo_url)
-    .bind(&payload.source_branch_name)
-    .fetch_one(&mut *transaction)
-    .await
-    .map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -374,6 +288,7 @@ mod tests {
         let config = crate::test_utils::create_test_config();
         let state = AppState {
             config: std::sync::Arc::new(config),
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
             db_pool: pool.clone(),
         };
         let payload = CreateSubscriber {
@@ -447,6 +362,7 @@ mod tests {
         let config = crate::test_utils::create_test_config();
         let state = AppState {
             config: std::sync::Arc::new(config),
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
             db_pool: pool.clone(),
         };
 
@@ -500,6 +416,7 @@ mod tests {
         let config = crate::test_utils::create_test_config();
         let state = AppState {
             config: std::sync::Arc::new(config),
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
             db_pool: pool.clone(),
         };
         let payload = CreateSubscriber {

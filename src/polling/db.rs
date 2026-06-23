@@ -12,7 +12,7 @@ use crate::{
 pub(super) async fn gather_updated_branches(
     ctx: &SharedContext,
 ) -> Result<Vec<BranchInfo>, sqlx::Error> {
-    let branch_results = stream::iter(collect_branches(&ctx.db_pool).await?)
+    let branch_results = stream::iter(collect_branches(ctx.repository.get_pool()).await?)
         .map(|b| BranchInfo::new(b, ctx.git_fetcher.as_ref()))
         .buffer_unordered(ctx.config.database.polling_db_buffer_size)
         .collect::<Vec<Result<BranchInfo, CommitHashError>>>()

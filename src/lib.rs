@@ -55,6 +55,7 @@ pub mod error;
 pub mod handler;
 pub mod model;
 pub mod polling;
+pub mod repository;
 pub mod state;
 #[cfg(test)]
 mod test_utils;
@@ -69,9 +70,15 @@ type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result<(), FatalError> {
     let config = Config::load()?;
     let pool = init_database(&config).await?;
+    let repository = std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone()));
     let http_client = build_http_client(&config)?;
 
-    let ctx = init_context(pool.clone(), config.clone(), token.clone());
+    let ctx = init_context(
+        repository.clone(),
+        pool.clone(),
+        config.clone(),
+        token.clone(),
+    );
 
     crate::trigger::recover_stuck_tasks(&pool, &config).await?;
 
@@ -80,7 +87,7 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
         crate::engine::start_engine(engine, message, tracker);
     }
 
-    let app = build_router(pool, &config);
+    let app = build_router(repository, pool, &config);
 
     run_server(app, &ctx.config, token.clone()).await
 }
@@ -103,9 +110,15 @@ async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> 
 }
 
 /// Initializes the shared application context.
-fn init_context(pool: sqlx::SqlitePool, config: Config, token: CancellationToken) -> SharedContext {
+fn init_context(
+    repository: std::sync::Arc<crate::repository::SqliteRepository>,
+    pool: sqlx::SqlitePool,
+    config: Config,
+    token: CancellationToken,
+) -> SharedContext {
     SharedContext {
         config,
+        repository,
         db_pool: pool,
         token,
         git_fetcher: std::sync::Arc::new(crate::polling::git::MainGitFetcher),
@@ -199,9 +212,14 @@ mod health_handler {
 }
 
 /// Builds the application router.
-pub fn build_router(pool: sqlx::SqlitePool, config: &Config) -> Router {
+pub fn build_router(
+    repository: std::sync::Arc<crate::repository::SqliteRepository>,
+    pool: sqlx::SqlitePool,
+    config: &Config,
+) -> Router {
     let state = AppState {
         config: std::sync::Arc::new(config.clone()),
+        repository,
         db_pool: pool,
     };
 

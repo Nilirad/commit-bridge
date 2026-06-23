@@ -437,6 +437,9 @@ mod tests {
         let engine = TriggerEngine {
             ctx: SharedContext {
                 config: crate::test_utils::create_test_config(),
+                repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(
+                    pool.clone(),
+                )),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 git_fetcher: Arc::new(MockGitFetcher {
@@ -521,6 +524,9 @@ mod tests {
         let engine = TriggerEngine {
             ctx: SharedContext {
                 config: crate::test_utils::create_test_config(),
+                repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(
+                    pool.clone(),
+                )),
                 db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 git_fetcher: Arc::new(MockGitFetcher {
