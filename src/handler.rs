@@ -8,6 +8,7 @@ use crate::model::{
     CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, SubscriberPage,
     SubscriberPageLinks, UpdateSubscriber,
 };
+use crate::repository::branch::BranchRepository;
 use crate::repository::subscriber::SubscriberRepository;
 
 use crate::state::AppState;
@@ -259,7 +260,7 @@ async fn delete_subscriber_inner(
         .await?;
 
     if remaining_subscribers == 0 {
-        state.repository.delete_branch_by_id(branch_id).await?;
+        state.repository.delete_by_id(branch_id).await?;
     }
     Ok(())
 }

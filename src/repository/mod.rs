@@ -1,3 +1,5 @@
+//! Implementation of the repository pattern.
+
 pub mod branch;
 pub mod error;
 pub mod sqlite;

@@ -1,3 +1,5 @@
+//! SQLite implementation of the repository.
+
 use crate::model::{Branch, CreateSubscriber, Subscriber, TriggerQueueItem, UpdateSubscriber};
 use crate::repository::{
     RepositoryError, branch::BranchRepository, subscriber::SubscriberRepository,
@@ -7,15 +9,19 @@ use async_trait::async_trait;
 use sqlx::SqlitePool;
 
 #[derive(Debug)]
+/// Access point of the repository using a SQLite connection pool.
 pub struct SqliteRepository {
+    /// The SQLite connection pool to the database.
     pool: SqlitePool,
 }
 
 impl SqliteRepository {
+    /// Creates a new [`SqliteRepository`] from a [`SqlitePool`].
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
+    /// Returns the stored [`SqlitePool`].
     pub fn get_pool(&self) -> &SqlitePool {
         &self.pool
     }
@@ -38,12 +44,16 @@ impl BranchRepository for SqliteRepository {
             .map_err(RepositoryError::Database)
     }
 
-    async fn delete_by_id(&self, id: i64) -> Result<u64, RepositoryError> {
+    async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError> {
         let result = sqlx::query!("DELETE FROM branches WHERE id = ?", id)
             .execute(&self.pool)
             .await
             .map_err(RepositoryError::Database)?;
-        Ok(result.rows_affected())
+
+        if result.rows_affected() == 0 {
+            return Err(RepositoryError::NotFound);
+        }
+        Ok(())
     }
 }
 
@@ -179,14 +189,6 @@ impl SubscriberRepository for SqliteRepository {
         .fetch_one(&self.pool)
         .await
         .map_err(RepositoryError::Database)
-    }
-
-    async fn delete_branch_by_id(&self, branch_id: i64) -> Result<(), RepositoryError> {
-        sqlx::query!("DELETE FROM branches WHERE id = ?", branch_id)
-            .execute(&self.pool)
-            .await
-            .map_err(RepositoryError::Database)?;
-        Ok(())
     }
 }
 
