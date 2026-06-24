@@ -1,8 +1,11 @@
-use crate::{build_router, domain::NonEmptyString, test_utils::create_test_db};
+use crate::{
+    build_router, domain::NonEmptyString, repository::SqliteRepository, test_utils::create_test_db,
+};
 use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use std::sync::Arc;
 use tower::ServiceExt; // for oneshot
 
 #[tokio::test]
@@ -12,7 +15,8 @@ async fn test_auth_no_key_configured_fails() {
     config.auth.api_key = None;
     config.auth.allow_unauthenticated = false;
 
-    let app = build_router(pool, &config);
+    let repository = Arc::new(SqliteRepository::new(pool.clone()));
+    let app = build_router(repository, pool, &config);
 
     let response = app
         .oneshot(
@@ -35,7 +39,8 @@ async fn test_auth_allowed_unauthenticated_success() {
     config.auth.api_key = None;
     config.auth.allow_unauthenticated = true;
 
-    let app = build_router(pool, &config);
+    let repository = Arc::new(SqliteRepository::new(pool.clone()));
+    let app = build_router(repository, pool, &config);
 
     let response = app
         .oneshot(
@@ -57,7 +62,8 @@ async fn test_auth_key_configured_success() {
     let mut config = crate::test_utils::create_test_config();
     config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
-    let app = build_router(pool, &config);
+    let repository = Arc::new(SqliteRepository::new(pool.clone()));
+    let app = build_router(repository, pool, &config);
 
     let response = app
         .oneshot(
@@ -80,7 +86,8 @@ async fn test_auth_key_configured_mismatch() {
     let mut config = crate::test_utils::create_test_config();
     config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
-    let app = build_router(pool, &config);
+    let repository = Arc::new(SqliteRepository::new(pool.clone()));
+    let app = build_router(repository, pool, &config);
 
     let response = app
         .oneshot(
@@ -103,7 +110,8 @@ async fn test_auth_key_configured_missing() {
     let mut config = crate::test_utils::create_test_config();
     config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
-    let app = build_router(pool, &config);
+    let repository = Arc::new(SqliteRepository::new(pool.clone()));
+    let app = build_router(repository, pool, &config);
 
     let response = app
         .oneshot(

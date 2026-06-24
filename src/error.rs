@@ -1,5 +1,6 @@
 //! Definitions for common error types.
 
+use crate::repository::RepositoryError;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -27,12 +28,21 @@ impl IntoResponse for ValidationError {
 #[derive(Debug, Error)]
 pub enum HandlerError {
     /// Database query execution failure.
-    #[error("SQLx Error: {0}")]
-    DbQuery(#[from] sqlx::Error),
+    #[error("Repository Error: {0}")]
+    DbQuery(RepositoryError),
 
     /// Requested resource not found.
     #[error("Not Found")]
     NotFound,
+}
+
+impl From<RepositoryError> for HandlerError {
+    fn from(err: RepositoryError) -> Self {
+        match err {
+            RepositoryError::NotFound => HandlerError::NotFound,
+            other => HandlerError::DbQuery(other),
+        }
+    }
 }
 
 impl OperationOutput for HandlerError {
@@ -55,6 +65,10 @@ pub enum FatalError {
     /// Database is down or URL is incorrect.
     #[error("Database connection: {0}")]
     DbConnection(#[from] sqlx::Error),
+
+    /// Repository error.
+    #[error("Repository error: {0}")]
+    Repository(#[from] RepositoryError),
 
     /// Error in database migration.
     #[error("Database migration: {0}")]

@@ -1,20 +1,21 @@
 //! Asynchronous task to periodically check for updated remote branches.
 
 use async_trait::async_trait;
-
-use tracing::info;
+use futures::{StreamExt, future::BoxFuture, stream};
+use tracing::{info, warn};
 
 use crate::{
     context::SharedContext,
     engine::AsyncEngine,
+    error::CommitHashError,
     polling::{
-        db::gather_updated_branches,
+        branch::BranchInfo,
         error::{PollingError, handle_polling_error},
     },
+    repository::{RepositoryError, branch::BranchRepository, trigger::TriggerRepository},
 };
 
 mod branch;
-mod db;
 mod error;
 pub mod git;
 
@@ -55,33 +56,73 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
         return Ok(());
     }
 
-    let mut transaction = ctx.db_pool.begin().await?;
+    let repository = ctx.repository.clone();
+    let shared_branches = std::sync::Arc::new(updated_branches);
+    ctx.repository
+        .run_in_transaction(|tx| {
+            execute_branch_updates(repository.clone(), shared_branches.clone(), tx)
+        })
+        .await?;
 
-    for branch_info in &updated_branches {
-        crate::polling::db::write_db(branch_info, &mut *transaction).await?;
+    Ok(())
+}
+
+/// Gathers stored branches that need to be updated.
+async fn gather_updated_branches(ctx: &SharedContext) -> Result<Vec<BranchInfo>, sqlx::Error> {
+    let branches = BranchRepository::get_all(ctx.repository.as_ref())
+        .await
+        .map_err(|e| match e {
+            crate::repository::RepositoryError::Database(e) => e,
+            _ => sqlx::Error::RowNotFound,
+        })?;
+
+    let branch_results = stream::iter(branches)
+        .map(|b| BranchInfo::new(b, ctx.git_fetcher.as_ref()))
+        .buffer_unordered(ctx.config.database.polling_db_buffer_size)
+        .collect::<Vec<Result<BranchInfo, CommitHashError>>>()
+        .await;
+
+    let errs = branch_results.iter().filter_map(|res| res.as_ref().err());
+    for e in errs {
+        warn!("{e}");
+    }
+
+    let updated_branches = branch_results
+        .into_iter()
+        .filter_map(|res| res.ok())
+        .filter(BranchInfo::has_updated)
+        .collect();
+    Ok(updated_branches)
+}
+
+/// Helper function to pin the branch update process.
+fn execute_branch_updates<'a>(
+    repository: std::sync::Arc<crate::repository::SqliteRepository>,
+    shared_branches: std::sync::Arc<Vec<branch::BranchInfo>>,
+    tx: &'a mut sqlx::SqliteConnection,
+) -> BoxFuture<'a, Result<(), RepositoryError>> {
+    Box::pin(process_branches(repository, shared_branches, tx))
+}
+
+/// Processes branch updates within a transaction.
+async fn process_branches(
+    repo: std::sync::Arc<crate::repository::SqliteRepository>,
+    shared_branches: std::sync::Arc<Vec<branch::BranchInfo>>,
+    tx: &mut sqlx::SqliteConnection,
+) -> Result<(), RepositoryError> {
+    let branches = std::sync::Arc::clone(&shared_branches);
+    for branch_info in branches.iter() {
+        repo.update_last_commit_hash_in_tx(branch_info.branch.id, &branch_info.latest_hash, tx)
+            .await?;
 
         info!(
             "New commit detected for branch {}. Hash: {}",
             branch_info.branch.name, branch_info.latest_hash
         );
 
-        sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash, target_repo, event_type, gh_app_installation_id)
-             SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id
-             FROM subscribers s
-             WHERE s.branch_id = ?
-             ON CONFLICT(branch_id, target_repo, event_type) WHERE status = 'PENDING'
-             DO UPDATE SET new_hash = excluded.new_hash, status_updated_at = CURRENT_TIMESTAMP",
-            branch_info.branch.id,
-            branch_info.latest_hash,
-            branch_info.branch.id
-        )
-        .execute(&mut *transaction)
-        .await?;
+        repo.queue_triggers_for_branch(branch_info.branch.id, &branch_info.latest_hash, tx)
+            .await?;
     }
-
-    transaction.commit().await?;
-
     Ok(())
 }
 
@@ -117,19 +158,23 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
 
         // Insert a branch
-        sqlx::query("INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)")
-            .bind("https://github.com/owner/repo")
-            .bind("main")
-            .bind("a".repeat(40))
-            .execute(&pool)
-            .await
-            .unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)",
+            "https://github.com/owner/repo",
+            "main",
+            hash
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         // Insert a subscriber
-        sqlx::query("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)")
-            .bind(1)
-            .bind("org/target")
-            .bind("dispatch")
-            .bind(1)
+        sqlx::query!("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+            1,
+            "org/target",
+            "dispatch",
+            1
+        )
             .execute(&pool)
             .await
             .unwrap();
@@ -140,6 +185,7 @@ mod tests {
 
         let ctx = SharedContext {
             config: crate::test_utils::create_test_config(),
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
             db_pool: pool.clone(),
             git_fetcher: mock_fetcher,
             token: CancellationToken::new(),
@@ -169,25 +215,30 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
 
         // Insert a branch
-        sqlx::query("INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)")
-            .bind("https://github.com/owner/repo")
-            .bind("main")
-            .bind("a".repeat(40))
-            .execute(&pool)
-            .await
-            .unwrap();
+        let hash = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)",
+            "https://github.com/owner/repo",
+            "main",
+            hash
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         // Insert a subscriber
-        sqlx::query("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)")
-            .bind(1)
-            .bind("org/target")
-            .bind("dispatch")
-            .bind(1)
+        sqlx::query!("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+            1,
+            "org/target",
+            "dispatch",
+            1
+        )
             .execute(&pool)
             .await
             .unwrap();
 
         let ctx = SharedContext {
             config: crate::test_utils::create_test_config(),
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
             db_pool: pool.clone(),
             git_fetcher: Arc::new(crate::test_utils::MockGitFetcher {
                 hash: CommitHash::new("b".repeat(40)).unwrap(),
@@ -205,6 +256,7 @@ mod tests {
         });
         let ctx = SharedContext {
             config: ctx.config,
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
             db_pool: pool.clone(),
             git_fetcher: mock_fetcher,
             token: ctx.token,
