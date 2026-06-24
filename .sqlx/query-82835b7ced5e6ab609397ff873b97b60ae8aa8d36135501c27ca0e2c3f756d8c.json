@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM subscribers WHERE id = ? RETURNING branch_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "branch_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "82835b7ced5e6ab609397ff873b97b60ae8aa8d36135501c27ca0e2c3f756d8c"
+}

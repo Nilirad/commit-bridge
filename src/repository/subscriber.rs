@@ -42,4 +42,7 @@ pub trait SubscriberRepository: Send + Sync {
 
     /// Counts the number of subscribers associated to the given `branch_id`.
     async fn count_subscribers_by_branch_id(&self, branch_id: i64) -> Result<i64, RepositoryError>;
+
+    /// Deletes a subscriber and cascades deletion to the associated branch if no other subscribers exist.
+    async fn delete_subscriber_and_cascade(&self, id: i64) -> Result<(), RepositoryError>;
 }

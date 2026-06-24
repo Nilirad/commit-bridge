@@ -8,7 +8,6 @@ use crate::model::{
     CreateSubscriber, HalLink, Subscriber, SubscriberHal, SubscriberLinks, SubscriberPage,
     SubscriberPageLinks, UpdateSubscriber,
 };
-use crate::repository::branch::BranchRepository;
 use crate::repository::subscriber::SubscriberRepository;
 
 use crate::state::AppState;
@@ -246,22 +245,7 @@ async fn delete_subscriber_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<(), HandlerError> {
-    let branch_id = state
-        .repository
-        .get_branch_id_by_subscriber_id(id)
-        .await?
-        .ok_or(HandlerError::NotFound)?;
-
-    state.repository.delete(id).await?;
-
-    let remaining_subscribers = state
-        .repository
-        .count_subscribers_by_branch_id(branch_id)
-        .await?;
-
-    if remaining_subscribers == 0 {
-        state.repository.delete_by_id(branch_id).await?;
-    }
+    state.repository.delete_subscriber_and_cascade(id).await?;
     Ok(())
 }
 
@@ -355,6 +339,35 @@ mod tests {
         // Verify delete
         let get_after_delete = get_subscriber_inner(State(state.clone()), Path(id)).await;
         assert!(get_after_delete.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_non_existent_subscriber_returns_not_found() {
+        let pool = create_test_db().await;
+        let config = crate::test_utils::create_test_config();
+        let state = AppState {
+            config: std::sync::Arc::new(config),
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
+            db_pool: pool.clone(),
+        };
+
+        // Try getting a non-existent subscriber
+        let get_res = get_subscriber_inner(State(state.clone()), Path(999)).await;
+        assert!(matches!(get_res, Err(HandlerError::NotFound)));
+
+        // Try updating a non-existent subscriber
+        let update_payload = UpdateSubscriber {
+            target_repo: Some(TargetRepo::new("org/new-target".to_string()).unwrap()),
+            event_type: None,
+            gh_app_installation_id: None,
+        };
+        let update_res =
+            update_subscriber_inner(State(state.clone()), Path(999), Json(update_payload)).await;
+        assert!(matches!(update_res, Err(HandlerError::NotFound)));
+
+        // Try deleting a non-existent subscriber
+        let delete_res = delete_subscriber_inner(State(state.clone()), Path(999)).await;
+        assert!(matches!(delete_res, Err(HandlerError::NotFound)));
     }
 
     #[tokio::test]

@@ -239,6 +239,39 @@ impl SubscriberRepository for SqliteRepository {
         .await
         .map_err(RepositoryError::Database)
     }
+
+    async fn delete_subscriber_and_cascade(&self, id: i64) -> Result<(), RepositoryError> {
+        self.run_in_transaction(|tx| {
+            Box::pin(async move {
+                let branch_id = sqlx::query_scalar!(
+                    "DELETE FROM subscribers WHERE id = ? RETURNING branch_id",
+                    id
+                )
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(RepositoryError::Database)?
+                .ok_or(RepositoryError::NotFound)?;
+
+                let remaining_subscribers = sqlx::query_scalar!(
+                    "SELECT COUNT(*) FROM subscribers WHERE branch_id = ?",
+                    branch_id
+                )
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(RepositoryError::Database)?;
+
+                if remaining_subscribers == 0 {
+                    sqlx::query!("DELETE FROM branches WHERE id = ?", branch_id)
+                        .execute(&mut *tx)
+                        .await
+                        .map_err(RepositoryError::Database)?;
+                }
+
+                Ok(())
+            })
+        })
+        .await
+    }
 }
 
 #[async_trait]
@@ -261,33 +294,21 @@ impl TriggerRepository for SqliteRepository {
     async fn find_oldest_pending_and_mark_processing(
         &self,
     ) -> Result<Option<TriggerQueueItem>, RepositoryError> {
-        self.run_in_transaction(|tx| {
-            Box::pin(async move {
-                let trigger = sqlx::query_as::<_, TriggerQueueItem>(
-                    "SELECT id, branch_id, new_hash, retry_count, target_repo, event_type, gh_app_installation_id FROM trigger_queue
-                     WHERE status IN ('PENDING') AND next_retry_at <= CURRENT_TIMESTAMP
-                     ORDER BY next_retry_at ASC LIMIT 1",
-                )
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(RepositoryError::Database)?;
-
-                let Some(trigger) = trigger else {
-                    return Ok(None);
-                };
-
-                sqlx::query!(
-                    "UPDATE trigger_queue SET status = 'PROCESSING', status_updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    trigger.id
-                )
-                .execute(&mut *tx)
-                .await
-                .map_err(RepositoryError::Database)?;
-
-                Ok(Some(trigger))
-            })
-        })
+        let trigger = sqlx::query_as::<_, TriggerQueueItem>(
+            "UPDATE trigger_queue 
+             SET status = 'PROCESSING', status_updated_at = CURRENT_TIMESTAMP 
+             WHERE id = (
+                 SELECT id FROM trigger_queue
+                 WHERE status IN ('PENDING') AND next_retry_at <= CURRENT_TIMESTAMP
+                 ORDER BY next_retry_at ASC LIMIT 1
+             )
+             RETURNING id, branch_id, new_hash, retry_count, target_repo, event_type, gh_app_installation_id",
+        )
+        .fetch_optional(&self.pool)
         .await
+        .map_err(RepositoryError::Database)?;
+
+        Ok(trigger)
     }
 
     async fn update_retry_status(&self, params: UpdateRetryStatus) -> Result<(), RepositoryError> {

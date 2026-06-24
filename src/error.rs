@@ -29,11 +29,20 @@ impl IntoResponse for ValidationError {
 pub enum HandlerError {
     /// Database query execution failure.
     #[error("Repository Error: {0}")]
-    DbQuery(#[from] RepositoryError),
+    DbQuery(RepositoryError),
 
     /// Requested resource not found.
     #[error("Not Found")]
     NotFound,
+}
+
+impl From<RepositoryError> for HandlerError {
+    fn from(err: RepositoryError) -> Self {
+        match err {
+            RepositoryError::NotFound => HandlerError::NotFound,
+            other => HandlerError::DbQuery(other),
+        }
+    }
 }
 
 impl OperationOutput for HandlerError {
