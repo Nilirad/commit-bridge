@@ -13,6 +13,10 @@ pub enum WorkflowTriggerError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
+    /// Repository error.
+    #[error("Repository error: {0}")]
+    Repository(#[from] crate::repository::RepositoryError),
+
     /// API service error.
     #[error(transparent)]
     Api(#[from] RequestError),

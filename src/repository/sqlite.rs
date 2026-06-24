@@ -2,8 +2,10 @@
 
 use crate::model::{Branch, CreateSubscriber, Subscriber, TriggerQueueItem, UpdateSubscriber};
 use crate::repository::{
-    RepositoryError, branch::BranchRepository, subscriber::SubscriberRepository,
-    trigger::TriggerRepository,
+    RepositoryError,
+    branch::BranchRepository,
+    subscriber::SubscriberRepository,
+    trigger::{TriggerRepository, UpdateRetryStatus},
 };
 use async_trait::async_trait;
 use futures::future::BoxFuture;
@@ -253,6 +255,81 @@ impl TriggerRepository for SqliteRepository {
             .execute(&self.pool)
             .await
             .map_err(RepositoryError::Database)?;
+        Ok(())
+    }
+
+    async fn find_oldest_pending_and_mark_processing(
+        &self,
+    ) -> Result<Option<TriggerQueueItem>, RepositoryError> {
+        self.run_in_transaction(|tx| {
+            Box::pin(async move {
+                let trigger = sqlx::query_as::<_, TriggerQueueItem>(
+                    "SELECT id, branch_id, new_hash, retry_count, target_repo, event_type, gh_app_installation_id FROM trigger_queue
+                     WHERE status IN ('PENDING') AND next_retry_at <= CURRENT_TIMESTAMP
+                     ORDER BY next_retry_at ASC LIMIT 1",
+                )
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(RepositoryError::Database)?;
+
+                let Some(trigger) = trigger else {
+                    return Ok(None);
+                };
+
+                sqlx::query!(
+                    "UPDATE trigger_queue SET status = 'PROCESSING', status_updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    trigger.id
+                )
+                .execute(&mut *tx)
+                .await
+                .map_err(RepositoryError::Database)?;
+
+                Ok(Some(trigger))
+            })
+        })
+        .await
+    }
+
+    async fn update_retry_status(&self, params: UpdateRetryStatus) -> Result<(), RepositoryError> {
+        let next_retry_count = params.retry_count + 1;
+
+        if next_retry_count as u32 >= params.max_attempts {
+            sqlx::query!(
+                "UPDATE trigger_queue SET status = 'FAILED', retry_count = ? WHERE id = ?",
+                next_retry_count,
+                params.id
+            )
+            .execute(&self.pool)
+            .await
+            .map_err(RepositoryError::Database)?;
+        } else {
+            let backoff_secs = (params.backoff_base_secs * (1 << (next_retry_count - 1))) as i64;
+            sqlx::query!(
+                "UPDATE trigger_queue SET status = 'PENDING', retry_count = ?, next_retry_at = datetime('now', ? || ' seconds') WHERE id = ?",
+                next_retry_count,
+                backoff_secs,
+                params.id
+            )
+            .execute(&self.pool)
+            .await
+            .map_err(RepositoryError::Database)?;
+        }
+        Ok(())
+    }
+
+    async fn recover_stuck_tasks(&self, threshold_seconds: u64) -> Result<(), RepositoryError> {
+        let threshold_str = format!("-{} seconds", threshold_seconds);
+
+        sqlx::query!(
+            "UPDATE trigger_queue
+             SET status = 'PENDING', status_updated_at = CURRENT_TIMESTAMP
+             WHERE status = 'PROCESSING'
+               AND status_updated_at < DATETIME('now', ?)",
+            threshold_str
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(RepositoryError::Database)?;
         Ok(())
     }
 

@@ -2,14 +2,13 @@
 
 use async_trait::async_trait;
 use reqwest::Client;
-use sqlx::SqlitePool;
 use tracing::{info, warn};
 
 use crate::{
-    config::Config,
     context::SharedContext,
     engine::AsyncEngine,
     model::{Subscriber, TriggerQueueItem},
+    repository::trigger::{TriggerRepository, UpdateRetryStatus},
     trigger::error::{RequestError, WorkflowTriggerError},
 };
 
@@ -54,14 +53,19 @@ async fn trigger_loop(engine: &TriggerEngine) {
 
 /// Processes a single queued event.
 async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
-    let Some(trigger) = get_oldest_queued_trigger(&engine.ctx.db_pool).await? else {
+    let Some(trigger) = engine
+        .ctx
+        .repository
+        .find_oldest_pending_and_mark_processing()
+        .await?
+    else {
         return Ok(());
     };
 
     let dispatch_result = dispatch_events(engine, &trigger).await;
     match dispatch_result {
         Ok(_) => {
-            delete_trigger_from_queue(engine, &trigger).await?;
+            engine.ctx.repository.delete_by_id(trigger.id).await?;
         }
         Err(e) => {
             warn!("Dispatch failed: {e}");
@@ -69,43 +73,6 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
         }
     }
 
-    Ok(())
-}
-
-/// Returns the oldest `PENDING` trigger in the `trigger_queue` table.
-async fn get_oldest_queued_trigger(
-    pool: &SqlitePool,
-) -> Result<Option<TriggerQueueItem>, sqlx::Error> {
-    let trigger = sqlx::query_as::<_, TriggerQueueItem>(
-        "SELECT id, branch_id, new_hash, retry_count, target_repo, event_type, gh_app_installation_id FROM trigger_queue
-         WHERE status IN ('PENDING') AND next_retry_at <= CURRENT_TIMESTAMP
-         ORDER BY next_retry_at ASC LIMIT 1",
-    )
-    .fetch_optional(pool)
-    .await?;
-
-    let Some(trigger) = trigger else {
-        return Ok(None);
-    };
-
-    sqlx::query!(
-        "UPDATE trigger_queue SET status = 'PROCESSING', status_updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        trigger.id
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(Some(trigger))
-}
-
-/// Deletes a successful trigger from the `trigger_queue`.
-async fn delete_trigger_from_queue(
-    engine: &TriggerEngine,
-    trigger: &TriggerQueueItem,
-) -> Result<(), sqlx::Error> {
-    sqlx::query!("DELETE FROM trigger_queue WHERE id = ?", trigger.id)
-        .execute(&engine.ctx.db_pool)
-        .await?;
     Ok(())
 }
 
@@ -130,42 +97,30 @@ async fn schedule_retry(
             trigger.id,
             max_attempts
         );
-        sqlx::query!(
-            "UPDATE trigger_queue SET status = 'FAILED', retry_count = ? WHERE id = ?",
-            next_retry_count,
-            trigger.id
-        )
-        .execute(&engine.ctx.db_pool)
-        .await?;
-    } else {
-        let backoff_secs = (backoff_base_secs * (1 << (next_retry_count - 1))) as i64;
-        sqlx::query!(
-            "UPDATE trigger_queue SET status = 'PENDING', retry_count = ?, next_retry_at = datetime('now', ? || ' seconds') WHERE id = ?",
-            next_retry_count,
-            backoff_secs,
-            trigger.id
-        )
-        .execute(&engine.ctx.db_pool)
-        .await?;
     }
+
+    engine
+        .ctx
+        .repository
+        .update_retry_status(UpdateRetryStatus {
+            id: trigger.id,
+            retry_count: trigger.retry_count,
+            max_attempts,
+            backoff_base_secs,
+        })
+        .await?;
 
     Ok(())
 }
 
 /// Recovers tasks that have been stuck in `PROCESSING` for too long.
-pub async fn recover_stuck_tasks(pool: &SqlitePool, config: &Config) -> Result<(), sqlx::Error> {
+pub async fn recover_stuck_tasks(
+    repo: &crate::repository::SqliteRepository,
+    config: &crate::config::Config,
+) -> Result<(), crate::repository::RepositoryError> {
     let threshold_seconds = config.engine.stuck_task_threshold.as_secs();
-    let threshold_str = format!("-{} seconds", threshold_seconds);
 
-    sqlx::query!(
-        "UPDATE trigger_queue
-         SET status = 'PENDING', status_updated_at = CURRENT_TIMESTAMP
-         WHERE status = 'PROCESSING'
-           AND status_updated_at < DATETIME('now', ?)",
-        threshold_str
-    )
-    .execute(pool)
-    .await?;
+    repo.recover_stuck_tasks(threshold_seconds).await?;
     Ok(())
 }
 
@@ -332,9 +287,12 @@ mod tests {
         .await
         .unwrap();
 
-        recover_stuck_tasks(&pool, &crate::test_utils::create_test_config())
-            .await
-            .unwrap();
+        recover_stuck_tasks(
+            &crate::repository::SqliteRepository::new(pool.clone()),
+            &crate::test_utils::create_test_config(),
+        )
+        .await
+        .unwrap();
 
         // Check status
         let tasks = sqlx::query!("SELECT status FROM trigger_queue ORDER BY rowid")
@@ -395,7 +353,12 @@ mod tests {
         .await
         .unwrap();
 
-        let trigger = get_oldest_queued_trigger(&pool).await.unwrap().unwrap();
+        let repo = crate::repository::SqliteRepository::new(pool.clone());
+        let trigger = repo
+            .find_oldest_pending_and_mark_processing()
+            .await
+            .unwrap()
+            .unwrap();
 
         // Assert: The one with -5 minutes should be returned
         assert_eq!(trigger.retry_count, 0);

@@ -28,8 +28,8 @@ impl IntoResponse for ValidationError {
 #[derive(Debug, Error)]
 pub enum HandlerError {
     /// Database query execution failure.
-    #[error("SQLx Error: {0}")]
-    DbQuery(#[from] sqlx::Error),
+    #[error("Repository Error: {0}")]
+    DbQuery(#[from] RepositoryError),
 
     /// Requested resource not found.
     #[error("Not Found")]
@@ -56,6 +56,10 @@ pub enum FatalError {
     /// Database is down or URL is incorrect.
     #[error("Database connection: {0}")]
     DbConnection(#[from] sqlx::Error),
+
+    /// Repository error.
+    #[error("Repository error: {0}")]
+    Repository(#[from] RepositoryError),
 
     /// Error in database migration.
     #[error("Database migration: {0}")]
@@ -154,13 +158,4 @@ pub enum CommitHashError {
         /// The relevant git branch.
         branch: String,
     },
-}
-
-impl From<RepositoryError> for HandlerError {
-    fn from(e: RepositoryError) -> Self {
-        match e {
-            RepositoryError::NotFound => HandlerError::NotFound,
-            RepositoryError::Database(e) => HandlerError::DbQuery(e),
-        }
-    }
 }

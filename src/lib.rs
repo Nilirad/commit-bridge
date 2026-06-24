@@ -80,7 +80,9 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
         token.clone(),
     );
 
-    crate::trigger::recover_stuck_tasks(&pool, &config).await?;
+    crate::trigger::recover_stuck_tasks(&repository, &config)
+        .await
+        .map_err(FatalError::Repository)?;
 
     let engines = init_engines(&ctx, http_client)?;
     for (engine, message) in engines {
