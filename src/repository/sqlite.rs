@@ -6,7 +6,8 @@ use crate::repository::{
     trigger::TriggerRepository,
 };
 use async_trait::async_trait;
-use sqlx::SqlitePool;
+use futures::future::BoxFuture;
+use sqlx::{SqliteConnection, SqlitePool};
 
 #[derive(Debug)]
 /// Access point of the repository using a SQLite connection pool.
@@ -24,6 +25,19 @@ impl SqliteRepository {
     /// Returns the stored [`SqlitePool`].
     pub fn get_pool(&self) -> &SqlitePool {
         &self.pool
+    }
+
+    /// Runs a closure within a transaction.
+    pub async fn run_in_transaction<'a, F, T, E>(&self, f: F) -> Result<T, E>
+    where
+        F: for<'b> FnOnce(&'b mut SqliteConnection) -> BoxFuture<'b, Result<T, E>> + Send + 'a,
+        E: From<sqlx::Error> + Send + 'a,
+        T: Send + 'a,
+    {
+        let mut tx = self.pool.begin().await?;
+        let result = f(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -53,6 +67,39 @@ impl BranchRepository for SqliteRepository {
         if result.rows_affected() == 0 {
             return Err(RepositoryError::NotFound);
         }
+        Ok(())
+    }
+
+    async fn update_last_commit_hash(
+        &self,
+        id: i64,
+        hash: &crate::domain::CommitHash,
+    ) -> Result<(), RepositoryError> {
+        sqlx::query!(
+            "UPDATE branches SET last_commit_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            hash,
+            id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(RepositoryError::Database)?;
+        Ok(())
+    }
+
+    async fn update_last_commit_hash_in_tx(
+        &self,
+        id: i64,
+        hash: &crate::domain::CommitHash,
+        tx: &mut sqlx::SqliteConnection,
+    ) -> Result<(), RepositoryError> {
+        sqlx::query!(
+            "UPDATE branches SET last_commit_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            hash,
+            id
+        )
+        .execute(tx)
+        .await
+        .map_err(RepositoryError::Database)?;
         Ok(())
     }
 }
@@ -206,6 +253,29 @@ impl TriggerRepository for SqliteRepository {
             .execute(&self.pool)
             .await
             .map_err(RepositoryError::Database)?;
+        Ok(())
+    }
+
+    async fn queue_triggers_for_branch(
+        &self,
+        branch_id: i64,
+        new_hash: &crate::domain::CommitHash,
+        executor: &mut sqlx::SqliteConnection,
+    ) -> Result<(), RepositoryError> {
+        sqlx::query!(
+            "INSERT INTO trigger_queue (branch_id, new_hash, target_repo, event_type, gh_app_installation_id)
+             SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id
+             FROM subscribers s
+             WHERE s.branch_id = ?
+             ON CONFLICT(branch_id, target_repo, event_type) WHERE status = 'PENDING'
+             DO UPDATE SET new_hash = excluded.new_hash, status_updated_at = CURRENT_TIMESTAMP",
+            branch_id,
+            new_hash,
+            branch_id
+        )
+        .execute(executor)
+        .await
+        .map_err(RepositoryError::Database)?;
         Ok(())
     }
 }

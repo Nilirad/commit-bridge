@@ -12,4 +12,12 @@ pub trait TriggerRepository: Send + Sync {
 
     /// Deletes the trigger queue item with the given `id`.
     async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
+
+    /// Queues trigger events for all subscribers of a branch.
+    async fn queue_triggers_for_branch(
+        &self,
+        branch_id: i64,
+        new_hash: &crate::domain::CommitHash,
+        executor: &mut sqlx::SqliteConnection,
+    ) -> Result<(), RepositoryError>;
 }

@@ -1,6 +1,7 @@
 //! Handling for errors specific to the polling engine.
 
 use crate::context::SharedContext;
+use crate::repository::RepositoryError;
 
 use thiserror::Error;
 use tracing::{error, warn};
@@ -11,6 +12,15 @@ pub enum PollingError {
     /// Could not read or write database.
     #[error("Database operation failed: {0}")]
     DatabaseOperation(#[from] sqlx::Error),
+}
+
+impl From<RepositoryError> for PollingError {
+    fn from(error: RepositoryError) -> Self {
+        match error {
+            RepositoryError::Database(e) => PollingError::DatabaseOperation(e),
+            RepositoryError::NotFound => PollingError::DatabaseOperation(sqlx::Error::RowNotFound),
+        }
+    }
 }
 
 /// Handles polling engine errors.

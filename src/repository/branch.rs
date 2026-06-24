@@ -15,4 +15,19 @@ pub trait BranchRepository: Send + Sync {
 
     /// Deletes the branch with the given `id`.
     async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
+
+    /// Updates the last commit hash of the branch.
+    async fn update_last_commit_hash(
+        &self,
+        id: i64,
+        hash: &crate::domain::CommitHash,
+    ) -> Result<(), RepositoryError>;
+
+    /// Updates the last commit hash of the branch within a transaction.
+    async fn update_last_commit_hash_in_tx(
+        &self,
+        id: i64,
+        hash: &crate::domain::CommitHash,
+        tx: &mut sqlx::SqliteConnection,
+    ) -> Result<(), RepositoryError>;
 }
