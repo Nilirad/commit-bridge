@@ -16,7 +16,8 @@ fn test_config_validation_auth_enabled_with_key_success() {
     let mut config = create_test_config();
     config.auth.allow_unauthenticated = false;
     config.auth.api_key = Some(crate::domain::NonEmptyString::new("secret".to_string()).unwrap());
-    config.auth.token_validity = Duration::from_secs(10); // Ensure token_validity > clock_drift_buffer
+    // Ensure token_validity > clock_drift_buffer
+    config.auth.token_validity = Duration::from_secs(10);
 
     assert!(config.validate().is_ok());
 }

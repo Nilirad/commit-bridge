@@ -6,7 +6,7 @@ use axum::{
     http::{Request, StatusCode},
 };
 use std::sync::Arc;
-use tower::ServiceExt; // for oneshot
+use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_auth_no_key_configured_fails() {

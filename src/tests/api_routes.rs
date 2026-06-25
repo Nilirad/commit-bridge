@@ -4,7 +4,7 @@ use axum::{
     http::{Request, StatusCode},
 };
 use std::sync::Arc;
-use tower::ServiceExt; // for oneshot
+use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_subscriber_api_routes() {
