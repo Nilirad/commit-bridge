@@ -1,10 +1,12 @@
 //! SQLite implementation of the repository.
 
-use crate::model::{Branch, CreateSubscriber, Subscriber, TriggerQueueItem, UpdateSubscriber};
+use crate::model::{
+    Branch, CreateSubscription, Subscription, TriggerQueueItem, UpdateSubscription,
+};
 use crate::repository::{
     RepositoryError,
     branch::BranchRepository,
-    subscriber::SubscriberRepository,
+    subscription::SubscriptionRepository,
     trigger::{TriggerRepository, UpdateRetryStatus},
 };
 use async_trait::async_trait;
@@ -107,8 +109,11 @@ impl BranchRepository for SqliteRepository {
 }
 
 #[async_trait]
-impl SubscriberRepository for SqliteRepository {
-    async fn create(&self, subscriber: &CreateSubscriber) -> Result<Subscriber, RepositoryError> {
+impl SubscriptionRepository for SqliteRepository {
+    async fn create(
+        &self,
+        subscription: &CreateSubscription,
+    ) -> Result<Subscription, RepositoryError> {
         let mut transaction = self.pool.begin().await.map_err(RepositoryError::Database)?;
 
         let branch_id = sqlx::query_scalar::<_, i64>(
@@ -116,19 +121,19 @@ impl SubscriberRepository for SqliteRepository {
              ON CONFLICT(repo_url, name) DO UPDATE SET repo_url=excluded.repo_url \
              RETURNING id",
         )
-        .bind(&subscriber.source_repo_url)
-        .bind(&subscriber.source_branch_name)
+        .bind(&subscription.source_repo_url)
+        .bind(&subscription.source_branch_name)
         .fetch_one(&mut *transaction)
         .await
         .map_err(RepositoryError::Database)?;
 
-        let subscriber = sqlx::query_as::<_, Subscriber>(
-            "INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?) RETURNING *",
+        let subscription = sqlx::query_as::<_, Subscription>(
+            "INSERT INTO subscriptions (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?) RETURNING *",
         )
         .bind(branch_id)
-        .bind(&subscriber.target_repo)
-        .bind(&subscriber.event_type)
-        .bind(subscriber.gh_app_installation_id)
+        .bind(&subscription.target_repo)
+        .bind(&subscription.event_type)
+        .bind(subscription.gh_app_installation_id)
         .fetch_one(&mut *transaction)
         .await
         .map_err(RepositoryError::Database)?;
@@ -137,11 +142,11 @@ impl SubscriberRepository for SqliteRepository {
             .commit()
             .await
             .map_err(RepositoryError::Database)?;
-        Ok(subscriber)
+        Ok(subscription)
     }
 
-    async fn get_by_id(&self, id: i64) -> Result<Option<Subscriber>, RepositoryError> {
-        sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers WHERE id = ?")
+    async fn get_by_id(&self, id: i64) -> Result<Option<Subscription>, RepositoryError> {
+        sqlx::query_as::<_, Subscription>("SELECT * FROM subscriptions WHERE id = ?")
             .bind(id)
             .fetch_optional(&self.pool)
             .await
@@ -152,9 +157,9 @@ impl SubscriberRepository for SqliteRepository {
         &self,
         last_id: i64,
         limit: i64,
-    ) -> Result<Vec<Subscriber>, RepositoryError> {
-        sqlx::query_as::<_, Subscriber>(
-            "SELECT * FROM subscribers WHERE id > ? ORDER BY id ASC LIMIT ?",
+    ) -> Result<Vec<Subscription>, RepositoryError> {
+        sqlx::query_as::<_, Subscription>(
+            "SELECT * FROM subscriptions WHERE id > ? ORDER BY id ASC LIMIT ?",
         )
         .bind(last_id)
         .bind(limit)
@@ -164,7 +169,7 @@ impl SubscriberRepository for SqliteRepository {
     }
 
     async fn count_remaining(&self, last_id: i64) -> Result<i64, RepositoryError> {
-        sqlx::query_scalar!("SELECT COUNT(*) FROM subscribers WHERE id > ?", last_id)
+        sqlx::query_scalar!("SELECT COUNT(*) FROM subscriptions WHERE id > ?", last_id)
             .fetch_one(&self.pool)
             .await
             .map_err(RepositoryError::Database)
@@ -173,22 +178,22 @@ impl SubscriberRepository for SqliteRepository {
     async fn update(
         &self,
         id: i64,
-        subscriber: &UpdateSubscriber,
-    ) -> Result<Subscriber, RepositoryError> {
-        let mut query_builder = sqlx::QueryBuilder::new("UPDATE subscribers SET ");
+        subscription: &UpdateSubscription,
+    ) -> Result<Subscription, RepositoryError> {
+        let mut query_builder = sqlx::QueryBuilder::new("UPDATE subscriptions SET ");
         let mut separated = query_builder.separated(", ");
 
-        if let Some(target_repo) = &subscriber.target_repo {
+        if let Some(target_repo) = &subscription.target_repo {
             separated
                 .push("target_repo = ")
                 .push_bind_unseparated(target_repo);
         }
-        if let Some(event_type) = &subscriber.event_type {
+        if let Some(event_type) = &subscription.event_type {
             separated
                 .push("event_type = ")
                 .push_bind_unseparated(event_type);
         }
-        if let Some(gh_app_installation_id) = subscriber.gh_app_installation_id {
+        if let Some(gh_app_installation_id) = subscription.gh_app_installation_id {
             separated
                 .push("gh_app_installation_id = ")
                 .push_bind_unseparated(gh_app_installation_id);
@@ -201,7 +206,7 @@ impl SubscriberRepository for SqliteRepository {
         query_builder.push(" RETURNING *");
 
         query_builder
-            .build_query_as::<Subscriber>()
+            .build_query_as::<Subscription>()
             .fetch_optional(&self.pool)
             .await
             .map_err(RepositoryError::Database)?
@@ -209,7 +214,7 @@ impl SubscriberRepository for SqliteRepository {
     }
 
     async fn delete(&self, id: i64) -> Result<(), RepositoryError> {
-        let result = sqlx::query!("DELETE FROM subscribers WHERE id = ?", id)
+        let result = sqlx::query!("DELETE FROM subscriptions WHERE id = ?", id)
             .execute(&self.pool)
             .await
             .map_err(RepositoryError::Database)?;
@@ -220,19 +225,22 @@ impl SubscriberRepository for SqliteRepository {
         Ok(())
     }
 
-    async fn get_branch_id_by_subscriber_id(
+    async fn get_branch_id_by_subscription_id(
         &self,
         id: i64,
     ) -> Result<Option<i64>, RepositoryError> {
-        sqlx::query_scalar!("SELECT branch_id FROM subscribers WHERE id = ?", id)
+        sqlx::query_scalar!("SELECT branch_id FROM subscriptions WHERE id = ?", id)
             .fetch_optional(&self.pool)
             .await
             .map_err(RepositoryError::Database)
     }
 
-    async fn count_subscribers_by_branch_id(&self, branch_id: i64) -> Result<i64, RepositoryError> {
+    async fn count_subscriptions_by_branch_id(
+        &self,
+        branch_id: i64,
+    ) -> Result<i64, RepositoryError> {
         sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM subscribers WHERE branch_id = ?",
+            "SELECT COUNT(*) FROM subscriptions WHERE branch_id = ?",
             branch_id
         )
         .fetch_one(&self.pool)
@@ -240,11 +248,11 @@ impl SubscriberRepository for SqliteRepository {
         .map_err(RepositoryError::Database)
     }
 
-    async fn delete_subscriber_and_cascade(&self, id: i64) -> Result<(), RepositoryError> {
+    async fn delete_subscription_and_cascade(&self, id: i64) -> Result<(), RepositoryError> {
         self.run_in_transaction(|tx| {
             Box::pin(async move {
                 let branch_id = sqlx::query_scalar!(
-                    "DELETE FROM subscribers WHERE id = ? RETURNING branch_id",
+                    "DELETE FROM subscriptions WHERE id = ? RETURNING branch_id",
                     id
                 )
                 .fetch_optional(&mut *tx)
@@ -252,15 +260,15 @@ impl SubscriberRepository for SqliteRepository {
                 .map_err(RepositoryError::Database)?
                 .ok_or(RepositoryError::NotFound)?;
 
-                let remaining_subscribers = sqlx::query_scalar!(
-                    "SELECT COUNT(*) FROM subscribers WHERE branch_id = ?",
+                let remaining_subscriptions = sqlx::query_scalar!(
+                    "SELECT COUNT(*) FROM subscriptions WHERE branch_id = ?",
                     branch_id
                 )
                 .fetch_one(&mut *tx)
                 .await
                 .map_err(RepositoryError::Database)?;
 
-                if remaining_subscribers == 0 {
+                if remaining_subscriptions == 0 {
                     sqlx::query!("DELETE FROM branches WHERE id = ?", branch_id)
                         .execute(&mut *tx)
                         .await
@@ -363,7 +371,7 @@ impl TriggerRepository for SqliteRepository {
         sqlx::query!(
             "INSERT INTO trigger_queue (branch_id, new_hash, target_repo, event_type, gh_app_installation_id)
              SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id
-             FROM subscribers s
+             FROM subscriptions s
              WHERE s.branch_id = ?
              ON CONFLICT(branch_id, target_repo, event_type) WHERE status = 'PENDING'
              DO UPDATE SET new_hash = excluded.new_hash, status_updated_at = CURRENT_TIMESTAMP",

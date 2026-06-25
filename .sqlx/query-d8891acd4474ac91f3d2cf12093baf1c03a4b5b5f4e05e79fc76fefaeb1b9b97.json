@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "DELETE FROM subscribers WHERE id = ?",
+  "query": "DELETE FROM subscriptions WHERE id = ?",
   "describe": {
     "columns": [],
     "parameters": {
@@ -8,5 +8,5 @@
     },
     "nullable": []
   },
-  "hash": "6d48a02ed6f3f0605a87d2e52a23283b7fe3088ac5a0fe0536dafbf2794ba70b"
+  "hash": "d8891acd4474ac91f3d2cf12093baf1c03a4b5b5f4e05e79fc76fefaeb1b9b97"
 }

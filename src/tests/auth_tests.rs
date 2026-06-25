@@ -21,7 +21,7 @@ async fn test_auth_no_key_configured_fails() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/subscribers")
+                .uri("/subscriptions")
                 .method("GET")
                 .body(Body::empty())
                 .unwrap(),
@@ -45,7 +45,7 @@ async fn test_auth_allowed_unauthenticated_success() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/subscribers")
+                .uri("/subscriptions")
                 .method("GET")
                 .body(Body::empty())
                 .unwrap(),
@@ -68,7 +68,7 @@ async fn test_auth_key_configured_success() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/subscribers")
+                .uri("/subscriptions")
                 .method("GET")
                 .header("X-API-KEY", "secret")
                 .body(Body::empty())
@@ -92,7 +92,7 @@ async fn test_auth_key_configured_mismatch() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/subscribers")
+                .uri("/subscriptions")
                 .method("GET")
                 .header("X-API-KEY", "wrong")
                 .body(Body::empty())
@@ -116,7 +116,7 @@ async fn test_auth_key_configured_missing() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/subscribers")
+                .uri("/subscriptions")
                 .method("GET")
                 .body(Body::empty())
                 .unwrap(),

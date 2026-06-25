@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn test_subscriber_api_routes() {
+async fn test_subscription_api_routes() {
     let pool = create_test_db().await;
     let mut config = crate::test_utils::create_test_config();
     config.auth.allow_unauthenticated = true;
@@ -15,12 +15,12 @@ async fn test_subscriber_api_routes() {
 
     let app = build_router(repository, pool, &config);
 
-    // Test List Subscribers (Empty)
+    // Test List Subscriptions (Empty)
     let response = app
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/subscribers")
+                .uri("/subscriptions")
                 .method("GET")
                 .body(Body::empty())
                 .unwrap(),
@@ -30,7 +30,7 @@ async fn test_subscriber_api_routes() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    // Test Create Subscriber
+    // Test Create Subscription
     let payload = serde_json::json!({
         "source_repo_url": "https://github.com/org/repo",
         "source_branch_name": "main",
@@ -43,7 +43,7 @@ async fn test_subscriber_api_routes() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/subscribers")
+                .uri("/subscriptions")
                 .method("POST")
                 .header("Content-Type", "application/json")
                 .body(Body::from(payload.to_string()))
@@ -62,12 +62,12 @@ async fn test_subscriber_api_routes() {
     let id = body_json["id"].as_i64().unwrap();
     assert_eq!(id, 1);
 
-    // Test Get Subscriber
+    // Test Get Subscription
     let response = app
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/subscribers/{}", id))
+                .uri(format!("/subscriptions/{}", id))
                 .method("GET")
                 .body(Body::empty())
                 .unwrap(),
@@ -77,12 +77,12 @@ async fn test_subscriber_api_routes() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    // Test Delete Subscriber
+    // Test Delete Subscription
     let response = app
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/subscribers/{}", id))
+                .uri(format!("/subscriptions/{}", id))
                 .method("DELETE")
                 .body(Body::empty())
                 .unwrap(),
@@ -97,7 +97,7 @@ async fn test_subscriber_api_routes() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/subscribers/{}", id))
+                .uri(format!("/subscriptions/{}", id))
                 .method("GET")
                 .body(Body::empty())
                 .unwrap(),

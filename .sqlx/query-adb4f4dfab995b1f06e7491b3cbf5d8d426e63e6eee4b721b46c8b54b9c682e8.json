@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "DELETE FROM subscribers WHERE id = ? RETURNING branch_id",
+  "query": "SELECT branch_id FROM subscriptions WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "82835b7ced5e6ab609397ff873b97b60ae8aa8d36135501c27ca0e2c3f756d8c"
+  "hash": "adb4f4dfab995b1f06e7491b3cbf5d8d426e63e6eee4b721b46c8b54b9c682e8"
 }

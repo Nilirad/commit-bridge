@@ -66,7 +66,7 @@ The `curl` command below is left as an example
 on how to subscribe to a branch.
 
 ```shell
-curl -X POST http://localhost:3000/subscribers \
+curl -X POST http://localhost:3000/subscriptions \
   -H "Content-Type: application/json" \
   -d '{
     "source_repo_url": "SOURCE_REPOSITORY",
@@ -168,13 +168,13 @@ cargo run --release
 
 ## Security
 
-By default, this server mandates authentication for all `/subscribers` endpoints.
+By default, this server mandates authentication for all `/subscriptions` endpoints.
 
 1. **Configure:** Set the `RELAY__AUTH__API_KEY` environment variable to a secure value in your `.env` file.
 2. **Authenticate:** Include the key in the `X-API-KEY` header for all requests:
 
     ```shell
-    curl -X GET http://localhost:3000/subscribers \
+    curl -X GET http://localhost:3000/subscriptions \
       -H "X-API-KEY: YOUR_API_KEY"
     ```
 

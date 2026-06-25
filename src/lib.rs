@@ -39,7 +39,8 @@ use crate::{
     engine::AsyncEngine,
     error::{ClientCreationError, FatalError},
     handler::{
-        create_subscriber, delete_subscriber, get_subscriber, list_subscribers, update_subscriber,
+        create_subscription, delete_subscription, get_subscription, list_subscriptions,
+        update_subscription,
     },
     polling::PollingEngine,
     state::AppState,
@@ -158,7 +159,7 @@ async fn auth_middleware(
     next: Next,
 ) -> Response<Body> {
     let needs_authentication =
-        req.uri().path().starts_with("/subscribers") && !state.config.auth.allow_unauthenticated;
+        req.uri().path().starts_with("/subscriptions") && !state.config.auth.allow_unauthenticated;
 
     if needs_authentication {
         let auth_header = req.headers().get("X-API-KEY").and_then(|v| v.to_str().ok());
@@ -195,7 +196,7 @@ pub fn verify_api_key(expected: Option<&NonEmptyString>, provided: Option<&str>)
 async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
     let path = req.uri().path().to_string();
     let mut response = next.run(req).await;
-    if path.starts_with("/subscribers") {
+    if path.starts_with("/subscriptions") {
         response.headers_mut().insert(
             header::CACHE_CONTROL,
             HeaderValue::from_static("private, no-cache, no-store, must-revalidate, max-age=0"),
@@ -228,23 +229,23 @@ pub fn build_router(
     let mut api = OpenApi::default();
     api.info.title = "Relay API".to_string();
     api.info.description =
-        Some("API for managing repository subscribers and triggering workflows".to_string());
+        Some("API for managing repository subscriptions and triggering workflows".to_string());
 
-    let subscribers = RovoRouter::<AppState>::new()
+    let subscriptions = RovoRouter::<AppState>::new()
         .route(
             "/",
-            rovo::routing::post(create_subscriber).get(list_subscribers),
+            rovo::routing::post(create_subscription).get(list_subscriptions),
         )
         .route(
             "/{id}",
-            rovo::routing::get(get_subscriber)
-                .patch(update_subscriber)
-                .delete(delete_subscriber),
+            rovo::routing::get(get_subscription)
+                .patch(update_subscription)
+                .delete(delete_subscription),
         );
 
     RovoRouter::<AppState>::new()
         .route("/health", rovo::routing::get(health_handler::health_check))
-        .nest("/subscribers", subscribers)
+        .nest("/subscriptions", subscriptions)
         .with_oas(api)
         .with_scalar("/scalar")
         .with_state(state.clone())

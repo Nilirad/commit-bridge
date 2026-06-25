@@ -3,7 +3,7 @@
 pub mod branch;
 pub mod error;
 pub mod sqlite;
-pub mod subscriber;
+pub mod subscription;
 pub mod trigger;
 
 pub use error::RepositoryError;
