@@ -134,14 +134,16 @@ pub async fn dispatch_events(
         trigger.branch_id, trigger.new_hash
     );
 
+    // TODO: Create a subscriber DTO that doesn't contain
+    // `id`, `created_at` and `updated_at`.
     let sub = Subscriber {
-        id: 0, // Not needed
+        id: 0,
         branch_id: trigger.branch_id,
         target_repo: trigger.target_repo.clone(),
         event_type: trigger.event_type.clone(),
         gh_app_installation_id: trigger.gh_app_installation_id,
-        created_at: chrono::Utc::now(), // Not needed
-        updated_at: chrono::Utc::now(), // Not needed
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
     };
 
     let iat = engine
@@ -247,7 +249,6 @@ mod tests {
     async fn test_recover_stuck_tasks() {
         let pool = crate::test_utils::create_test_db().await;
 
-        // Insert tasks
         // Insert tasks
         let hash = "a".repeat(40);
         // 1. Processing (stuck)

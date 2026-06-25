@@ -26,8 +26,6 @@ impl CommitHash {
     }
 }
 
-// Add these to satisfy SQLx
-
 crate::derive_sqlx_traits!(CommitHash);
 
 impl AsRef<str> for CommitHash {
