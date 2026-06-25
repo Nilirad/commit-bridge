@@ -381,6 +381,10 @@ mod tests {
         };
 
         // Create 3 subscribers
+        //
+        // Lint needs to be silenced here because the `#[tokio::test]` macro
+        // probably interferes with the nesting count.
+        #[allow(clippy::excessive_nesting)]
         for i in 0..3 {
             let payload = CreateSubscriber {
                 source_repo_url: RepoUrl::new(format!("https://github.com/org/repo{}", i)).unwrap(),
