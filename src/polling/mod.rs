@@ -168,8 +168,8 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        // Insert a subscriber
-        sqlx::query!("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+        // Insert a subscription
+        sqlx::query!("INSERT INTO subscriptions (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
             1,
             "org/target",
             "dispatch",
@@ -225,8 +225,8 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        // Insert a subscriber
-        sqlx::query!("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+        // Insert a subscription
+        sqlx::query!("INSERT INTO subscriptions (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
             1,
             "org/target",
             "dispatch",

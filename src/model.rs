@@ -33,9 +33,9 @@ pub struct Branch {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Represents a row in the `subscribers` table.
+/// Represents a row in the `subscriptions` table.
 #[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema)]
-pub struct Subscriber {
+pub struct Subscription {
     /// Unique database primary key.
     pub id: i64,
 
@@ -66,23 +66,23 @@ pub struct Subscriber {
     pub updated_at: DateTime<Utc>,
 }
 
-/// HAL links for a subscriber page.
+/// HAL links for a subscription page.
 #[derive(Serialize, JsonSchema)]
-pub struct SubscriberPageLinks {
+pub struct SubscriptionPageLinks {
     /// Next page link.
     pub next: Option<HalLink>,
 }
 
-/// Paginated representation of subscribers.
+/// Paginated representation of subscriptions.
 #[derive(Serialize, JsonSchema)]
-pub struct SubscriberPage {
-    /// The subscriber data.
-    pub data: Vec<SubscriberHal>,
+pub struct SubscriptionPage {
+    /// The subscription data.
+    pub data: Vec<SubscriptionHal>,
     /// Number of elements remaining after this page.
     pub remaining_count: i64,
     /// HAL links.
     #[serde(rename = "_links")]
-    pub links: SubscriberPageLinks,
+    pub links: SubscriptionPageLinks,
 }
 
 /// HAL link structure.
@@ -92,9 +92,9 @@ pub struct HalLink {
     pub href: String,
 }
 
-/// HAL links for a subscriber.
+/// HAL links for a subscription.
 #[derive(Serialize, JsonSchema)]
-pub struct SubscriberLinks {
+pub struct SubscriptionLinks {
     /// Self link.
     #[serde(rename = "self")]
     pub self_link: HalLink,
@@ -104,46 +104,46 @@ pub struct SubscriberLinks {
     pub delete: HalLink,
 }
 
-/// HAL representation of a subscriber.
+/// HAL representation of a subscription.
 #[derive(Serialize, JsonSchema)]
-pub struct SubscriberHal {
-    /// The subscriber data.
+pub struct SubscriptionHal {
+    /// The subscription data.
     #[serde(flatten)]
-    pub subscriber: Subscriber,
+    pub subscription: Subscription,
     /// HAL links.
     #[serde(rename = "_links")]
-    pub links: SubscriberLinks,
+    pub links: SubscriptionLinks,
 }
 
-/// Holds payload data for the creation of a [`Subscriber`].
+/// Holds payload data for the creation of a [`Subscription`].
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
-pub struct CreateSubscriber {
+pub struct CreateSubscription {
     /// Determines the value of [`Branch::repo_url`].
     pub source_repo_url: RepoUrl,
 
     /// Determines the value of [`Branch::name`].
     pub source_branch_name: BranchName,
 
-    /// Determines the value of [`Subscriber::target_repo`].
+    /// Determines the value of [`Subscription::target_repo`].
     pub target_repo: TargetRepo,
 
-    /// Determines the value of [`Subscriber::event_type`].
+    /// Determines the value of [`Subscription::event_type`].
     pub event_type: EventType,
 
-    /// Determines the value of [`Subscriber::gh_app_installation_id`].
+    /// Determines the value of [`Subscription::gh_app_installation_id`].
     pub gh_app_installation_id: i64,
 }
 
-/// Holds payload data for the update of a [`Subscriber`].
+/// Holds payload data for the update of a [`Subscription`].
 #[derive(Debug, Deserialize, JsonSchema)]
-pub struct UpdateSubscriber {
-    /// Determines the value of [`Subscriber::target_repo`].
+pub struct UpdateSubscription {
+    /// Determines the value of [`Subscription::target_repo`].
     pub target_repo: Option<TargetRepo>,
 
-    /// Determines the value of [`Subscriber::event_type`].
+    /// Determines the value of [`Subscription::event_type`].
     pub event_type: Option<EventType>,
 
-    /// Determines the value of [`Subscriber::gh_app_installation_id`].
+    /// Determines the value of [`Subscription::gh_app_installation_id`].
     pub gh_app_installation_id: Option<i64>,
 }
 

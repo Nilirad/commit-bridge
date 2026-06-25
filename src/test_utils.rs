@@ -39,7 +39,7 @@ pub struct MockAuthenticator {
 impl Authenticator for MockAuthenticator {
     async fn request_installation_token(
         &self,
-        _sub: &crate::model::Subscriber,
+        _sub: &crate::model::Subscription,
     ) -> Result<String, AuthError> {
         Ok(self.iat.clone())
     }
@@ -72,8 +72,8 @@ pub fn create_test_config() -> crate::config::Config {
             timeout: std::time::Duration::from_secs(1),
             polling_db_buffer_size: 1,
             polling_db_error_cooldown: std::time::Duration::from_secs(1),
-            subscribers_list_limit: 50,
-            subscribers_list_limit_cap: 100,
+            subscriptions_list_limit: 50,
+            subscriptions_list_limit_cap: 100,
         },
         github_api: crate::config::GitHubApiConfig {
             base_url: Url::parse("http://localhost").unwrap(),

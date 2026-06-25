@@ -8,7 +8,7 @@ use tracing::info;
 
 use crate::{
     config::Config,
-    model::Subscriber,
+    model::Subscription,
     trigger::error::{AuthError, RequestError},
 };
 
@@ -16,7 +16,7 @@ use crate::{
 #[async_trait]
 pub trait Authenticator {
     /// Requests a GitHub Installation Access Token.
-    async fn request_installation_token(&self, sub: &Subscriber) -> Result<String, AuthError>;
+    async fn request_installation_token(&self, sub: &Subscription) -> Result<String, AuthError>;
 }
 
 /// An [`Authenticator`] for GitHub.
@@ -35,10 +35,10 @@ pub struct GitHubAuthenticator {
 impl Authenticator for GitHubAuthenticator {
     async fn request_installation_token(
         &self,
-        subscriber: &Subscriber,
+        subscription: &Subscription,
     ) -> Result<String, AuthError> {
         let jwt = generate_gh_jwt(&self.encoding_key, &self.config)?;
-        request_iat(&self.http_client, &jwt, subscriber, &self.config).await
+        request_iat(&self.http_client, &jwt, subscription, &self.config).await
     }
 }
 
@@ -92,7 +92,7 @@ pub(super) fn generate_gh_jwt(key: &EncodingKey, config: &Config) -> Result<Stri
 pub(super) async fn request_iat(
     http_client: &Client,
     jwt: &str,
-    sub: &Subscriber,
+    sub: &Subscription,
     config: &Config,
 ) -> Result<String, AuthError> {
     #[derive(serde::Deserialize)]
@@ -118,7 +118,7 @@ pub(super) async fn request_iat(
 
     if response.status().is_success() {
         let response_json = response.json::<IatResponse>().await?;
-        info!("IAT received for subscriber {}", sub.target_repo);
+        info!("IAT received for subscription {}", sub.target_repo);
         Ok(response_json.token)
     } else {
         Err(AuthError::Server(RequestError::Response {

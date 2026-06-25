@@ -7,7 +7,7 @@ use tracing::{info, warn};
 use crate::{
     context::SharedContext,
     engine::AsyncEngine,
-    model::{Subscriber, TriggerQueueItem},
+    model::{Subscription, TriggerQueueItem},
     repository::trigger::{TriggerRepository, UpdateRetryStatus},
     trigger::error::{RequestError, WorkflowTriggerError},
 };
@@ -124,7 +124,7 @@ pub async fn recover_stuck_tasks(
     Ok(())
 }
 
-/// Sends a `repository_dispatch` event for each relevant [`Subscriber`].
+/// Sends a `repository_dispatch` event for each relevant [`Subscription`].
 pub async fn dispatch_events(
     engine: &TriggerEngine,
     trigger: &TriggerQueueItem,
@@ -134,9 +134,9 @@ pub async fn dispatch_events(
         trigger.branch_id, trigger.new_hash
     );
 
-    // TODO: Create a subscriber DTO that doesn't contain
+    // TODO: Create a subscription DTO that doesn't contain
     // `id`, `created_at` and `updated_at`.
-    let sub = Subscriber {
+    let sub = Subscription {
         id: 0,
         branch_id: trigger.branch_id,
         target_repo: trigger.target_repo.clone(),
@@ -150,29 +150,29 @@ pub async fn dispatch_events(
         .authenticator
         .request_installation_token(&sub)
         .await?;
-    notify_subscriber(engine, iat, trigger, sub).await?;
+    notify_subscription(engine, iat, trigger, sub).await?;
 
     Ok(())
 }
 
 /// Manages IAT authentication,
-/// and sends a `repository_dispatch` event to the specified [`Subscriber`].
-async fn notify_subscriber(
+/// and sends a `repository_dispatch` event to the specified [`Subscription`].
+async fn notify_subscription(
     engine: &TriggerEngine,
     iat: String,
     trigger: &TriggerQueueItem,
-    sub: Subscriber,
+    sub: Subscription,
 ) -> Result<(), WorkflowTriggerError> {
     send_repository_dispatch(engine, &iat, trigger, &sub).await?;
     Ok(())
 }
 
-/// Sends a `repository_dispatch` event to the specified [`Subscriber`].
+/// Sends a `repository_dispatch` event to the specified [`Subscription`].
 async fn send_repository_dispatch(
     engine: &TriggerEngine,
     iat: &str,
     trigger: &TriggerQueueItem,
-    sub: &Subscriber,
+    sub: &Subscription,
 ) -> Result<(), WorkflowTriggerError> {
     let api_url = format!(
         "{}/repos/{}/dispatches",
@@ -443,7 +443,7 @@ mod tests {
         let pool = crate::test_utils::create_test_db().await;
         let mock_server = MockServer::start().await;
 
-        // Setup subscriber
+        // Setup subscription
         sqlx::query!(
             "INSERT INTO branches (repo_url, name) VALUES (?, ?)",
             "repo",
@@ -452,7 +452,7 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        sqlx::query!("INSERT INTO subscribers (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+        sqlx::query!("INSERT INTO subscriptions (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
                      1, "org/target", "dispatch", 1).execute(&pool).await.unwrap();
 
         // Mock token success, but dispatch failure

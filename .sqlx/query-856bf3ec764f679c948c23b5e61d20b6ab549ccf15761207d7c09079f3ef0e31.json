@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT branch_id FROM subscribers WHERE id = ?",
+  "query": "SELECT COUNT(*) FROM subscriptions WHERE branch_id = ?",
   "describe": {
     "columns": [
       {
-        "name": "branch_id",
+        "name": "COUNT(*)",
         "ordinal": 0,
         "type_info": "Integer"
       }
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "23f36cd5e923c672f58a59f166a38705b6baa4a260eeba17cf496dd952bd6d35"
+  "hash": "856bf3ec764f679c948c23b5e61d20b6ab549ccf15761207d7c09079f3ef0e31"
 }

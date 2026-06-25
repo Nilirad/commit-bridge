@@ -3,10 +3,10 @@
 @targetRepo = my-org/my-target-repo
 @eventType = event_type
 @installationId = 12345678
-@subscriberId = 1
+@subscriptionId = 1
 
 ### Create subscription
-POST http://localhost:3000/subscribers
+POST http://localhost:3000/subscriptions
 Content-Type: application/json
 
 {
@@ -17,19 +17,19 @@ Content-Type: application/json
   "gh_app_installation_id": {{installationId}}
 }
 
-### List subscribers
-GET http://localhost:3000/subscribers
+### List subscriptions
+GET http://localhost:3000/subscriptions
 
-### Get subscriber
-GET http://localhost:3000/subscribers/{{subscriberId}}
+### Get subscription
+GET http://localhost:3000/subscriptions/{{subscriptionId}}
 
-### Update subscriber
-PATCH http://localhost:3000/subscribers/{{subscriberId}}
+### Update subscription
+PATCH http://localhost:3000/subscriptions/{{subscriptionId}}
 Content-Type: application/json
 
 {
   "target_repo": "my-org/new-target-repo"
 }
 
-### Delete subscriber
-DELETE http://localhost:3000/subscribers/{{subscriberId}}
+### Delete subscription
+DELETE http://localhost:3000/subscriptions/{{subscriptionId}}

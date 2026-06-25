@@ -118,19 +118,19 @@ pub struct DatabaseConfig {
     #[serde(with = "humantime_serde")]
     pub polling_db_error_cooldown: Duration,
 
-    /// The default limit for subscribers list pagination.
+    /// The default limit for subscriptions list pagination.
     #[validate(range(min = 1))]
-    pub subscribers_list_limit: usize,
+    pub subscriptions_list_limit: usize,
 
-    /// The maximum allowed limit for subscribers list pagination.
+    /// The maximum allowed limit for subscriptions list pagination.
     #[validate(range(min = 1))]
-    pub subscribers_list_limit_cap: usize,
+    pub subscriptions_list_limit_cap: usize,
 }
 
-/// Validates that the default pagination limit (`subscribers_list_limit`)
-/// does not exceed the maximum allowed cap (`subscribers_list_limit_cap`).
+/// Validates that the default pagination limit (`subscriptions_list_limit`)
+/// does not exceed the maximum allowed cap (`subscriptions_list_limit_cap`).
 fn validate_pagination_limits(config: &DatabaseConfig) -> Result<(), validator::ValidationError> {
-    if config.subscribers_list_limit > config.subscribers_list_limit_cap {
+    if config.subscriptions_list_limit > config.subscriptions_list_limit_cap {
         return Err(validator::ValidationError::new("limit_exceeds_cap"));
     }
     Ok(())
