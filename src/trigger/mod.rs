@@ -70,6 +70,13 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
         Ok(_) => {
             TriggerRepository::delete_by_id(&*engine.ctx.repository, trigger.id).await?;
         }
+        Err(WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)) => {
+            warn!(
+                "Subscription for branch ID {} and target repo {} was not found (likely deleted). Deleting trigger task {} from queue.",
+                trigger.branch_id, trigger.target_repo, trigger.id
+            );
+            TriggerRepository::delete_by_id(&*engine.ctx.repository, trigger.id).await?;
+        }
         Err(e) => {
             warn!("Dispatch failed: {e}");
             schedule_retry(engine, trigger, e).await?;
