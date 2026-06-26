@@ -86,9 +86,9 @@ pub struct ListSubscriptionsQuery {
     pub last_id: Option<i64>,
 }
 
-/// List all subscriptions.
+/// List subscriptions.
 ///
-/// Returns a list of all subscription mappings in the system.
+/// Returns a paginated list of all subscription mappings in the system.
 ///
 /// # Query Parameters
 ///
