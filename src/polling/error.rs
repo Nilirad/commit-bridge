@@ -19,6 +19,10 @@ impl From<RepositoryError> for PollingError {
         match error {
             RepositoryError::Database(e) => PollingError::DatabaseOperation(e),
             RepositoryError::NotFound => PollingError::DatabaseOperation(sqlx::Error::RowNotFound),
+            RepositoryError::Mapping(e) => {
+                error!("Data mapping error: {e}");
+                PollingError::DatabaseOperation(sqlx::Error::RowNotFound)
+            }
         }
     }
 }

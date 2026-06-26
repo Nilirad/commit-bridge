@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.*, b.repo_url as branch_repo_url, b.name as branch_name FROM subscriptions s JOIN branches b ON s.branch_id = b.id WHERE s.id > ? ORDER BY s.id ASC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "branch_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "target_repo",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "event_type",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "gh_app_installation_id",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "branch_repo_url",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "branch_name",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c515c7d432d01eb9bcca49d1f74bba800cf0a8ee5173a00e25d25d48adf78929"
+}
