@@ -43,7 +43,7 @@ pub struct Branch {
 }
 
 /// Represents a row in the `subscriptions` table.
-#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema, Clone)]
 pub struct Subscription {
     /// Unique database primary key.
     pub id: i64,
@@ -73,6 +73,15 @@ pub struct Subscription {
 
     /// Timestamp when the record was updated.
     pub updated_at: DateTime<Utc>,
+}
+
+/// Represents branch information for a subscription.
+#[derive(Debug, Serialize, JsonSchema, Clone)]
+pub struct SourceBranchInfo {
+    /// Full HTTPS URL of the monitored git repository.
+    pub repo_url: RepoUrl,
+    /// Name of the git branch to poll.
+    pub name: BranchName,
 }
 
 /// HAL links for a subscription page.
@@ -113,12 +122,24 @@ pub struct SubscriptionLinks {
     pub delete: HalLink,
 }
 
+/// Combined subscription and branch information.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SubscriptionWithBranch {
+    /// The subscription data.
+    #[serde(flatten)]
+    pub subscription: Subscription,
+    /// The source branch info.
+    pub source_branch: SourceBranchInfo,
+}
+
 /// HAL representation of a subscription.
 #[derive(Serialize, JsonSchema)]
 pub struct SubscriptionHal {
     /// The subscription data.
     #[serde(flatten)]
     pub subscription: Subscription,
+    /// The source repository and branch.
+    pub source_branch: SourceBranchInfo,
     /// HAL links.
     #[serde(rename = "_links")]
     pub links: SubscriptionLinks,

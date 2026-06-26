@@ -5,8 +5,8 @@
 
 use crate::error::HandlerError;
 use crate::model::{
-    CreateSubscription, HalLink, Subscription, SubscriptionHal, SubscriptionLinks,
-    SubscriptionPage, SubscriptionPageLinks, UpdateSubscription,
+    CreateSubscription, HalLink, SubscriptionHal, SubscriptionLinks, SubscriptionPage,
+    SubscriptionPageLinks, SubscriptionWithBranch, UpdateSubscription,
 };
 use crate::repository::subscription::SubscriptionRepository;
 
@@ -19,11 +19,12 @@ use rovo::rovo;
 use serde::Deserialize;
 use tracing::info;
 
-/// Maps a [`Subscription`] to its HAL representation.
-fn map_to_hal(subscription: Subscription) -> SubscriptionHal {
-    let id = subscription.id;
+/// Maps a [`SubscriptionWithBranch`] to its HAL representation.
+fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
+    let id = sub_with_branch.subscription.id;
     SubscriptionHal {
-        subscription,
+        subscription: sub_with_branch.subscription,
+        source_branch: sub_with_branch.source_branch,
         links: SubscriptionLinks {
             self_link: HalLink {
                 href: format!("/subscriptions/{}", id),
@@ -67,14 +68,28 @@ async fn create_subscription_inner(
     State(state): State<AppState>,
     Json(payload): Json<CreateSubscription>,
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
-    let subscription = state.repository.create(&payload).await?;
+    let sub_with_branch = state.repository.create(&payload).await?;
 
     info!(
         "Registered new subscription for branch ID {}: {:?}",
-        subscription.branch_id, subscription
+        sub_with_branch.subscription.branch_id, sub_with_branch.subscription
     );
 
-    Ok(Json(map_to_hal(subscription)))
+    Ok(Json(SubscriptionHal {
+        subscription: sub_with_branch.subscription.clone(),
+        source_branch: sub_with_branch.source_branch,
+        links: SubscriptionLinks {
+            self_link: HalLink {
+                href: format!("/subscriptions/{}", sub_with_branch.subscription.id),
+            },
+            update: HalLink {
+                href: format!("/subscriptions/{}", sub_with_branch.subscription.id),
+            },
+            delete: HalLink {
+                href: format!("/subscriptions/{}", sub_with_branch.subscription.id),
+            },
+        },
+    }))
 }
 
 /// Query parameters for listing subscriptions.
@@ -127,21 +142,46 @@ async fn list_subscriptions_inner(
 
     let subscriptions = state
         .repository
-        .list_paginated(last_id, limit as i64)
+        .list_paginated_with_branches(last_id, limit as i64)
         .await?;
 
-    let next_id = subscriptions.last().map(|s| s.id).unwrap_or(last_id);
+    let data: Vec<SubscriptionHal> = subscriptions
+        .into_iter()
+        .map(|s| {
+            let id = s.subscription.id;
+            SubscriptionHal {
+                subscription: s.subscription,
+                source_branch: s.source_branch,
+                links: SubscriptionLinks {
+                    self_link: HalLink {
+                        href: format!("/subscriptions/{}", id),
+                    },
+                    update: HalLink {
+                        href: format!("/subscriptions/{}", id),
+                    },
+                    delete: HalLink {
+                        href: format!("/subscriptions/{}", id),
+                    },
+                },
+            }
+        })
+        .collect();
+
+    let next_id = data.last().map(|s| s.subscription.id).unwrap_or(last_id);
     let remaining_count = state.repository.count_remaining(next_id).await?;
 
-    let next_link = subscriptions
+    let next_link = data
         .last()
         .filter(|_| remaining_count > 0)
         .map(|s| HalLink {
-            href: format!("/subscriptions?limit={}&last_id={}", limit, s.id),
+            href: format!(
+                "/subscriptions?limit={}&last_id={}",
+                limit, s.subscription.id
+            ),
         });
 
     Ok(Json(SubscriptionPage {
-        data: subscriptions.into_iter().map(map_to_hal).collect(),
+        data,
         remaining_count,
         links: SubscriptionPageLinks { next: next_link },
     }))
@@ -180,12 +220,12 @@ async fn get_subscription_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
-    let subscription = state
+    let sub_with_branch = state
         .repository
-        .get_by_id(id)
+        .get_by_id_with_branch(id)
         .await?
         .ok_or(HandlerError::NotFound)?;
-    Ok(Json(map_to_hal(subscription)))
+    Ok(Json(map_to_hal(sub_with_branch)))
 }
 
 /// Update an existing subscription.
@@ -224,9 +264,14 @@ async fn update_subscription_inner(
     Path(id): Path<i64>,
     Json(payload): Json<UpdateSubscription>,
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
-    let subscription = state.repository.update(id, &payload).await?;
+    state.repository.update(id, &payload).await?;
+    let sub_with_branch = state
+        .repository
+        .get_by_id_with_branch(id)
+        .await?
+        .ok_or(HandlerError::NotFound)?;
 
-    Ok(Json(map_to_hal(subscription)))
+    Ok(Json(map_to_hal(sub_with_branch)))
 }
 
 /// Delete a subscription.

@@ -1,7 +1,8 @@
 //! SQLite implementation of the repository.
 
 use crate::model::{
-    Branch, CreateSubscription, Subscription, TriggerQueueItem, UpdateSubscription,
+    Branch, CreateSubscription, Subscription, SubscriptionWithBranch, TriggerQueueItem,
+    UpdateSubscription,
 };
 use crate::repository::{
     RepositoryError,
@@ -112,8 +113,8 @@ impl BranchRepository for SqliteRepository {
 impl SubscriptionRepository for SqliteRepository {
     async fn create(
         &self,
-        subscription: &CreateSubscription,
-    ) -> Result<Subscription, RepositoryError> {
+        subscription_payload: &CreateSubscription,
+    ) -> Result<SubscriptionWithBranch, RepositoryError> {
         let mut transaction = self.pool.begin().await.map_err(RepositoryError::Database)?;
 
         let branch_id = sqlx::query_scalar::<_, i64>(
@@ -121,8 +122,8 @@ impl SubscriptionRepository for SqliteRepository {
              ON CONFLICT(repo_url, name) DO UPDATE SET repo_url=excluded.repo_url \
              RETURNING id",
         )
-        .bind(&subscription.source_repo_url)
-        .bind(&subscription.source_branch_name)
+        .bind(&subscription_payload.source_repo_url)
+        .bind(&subscription_payload.source_branch_name)
         .fetch_one(&mut *transaction)
         .await
         .map_err(RepositoryError::Database)?;
@@ -131,9 +132,9 @@ impl SubscriptionRepository for SqliteRepository {
             "INSERT INTO subscriptions (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?) RETURNING *",
         )
         .bind(branch_id)
-        .bind(&subscription.target_repo)
-        .bind(&subscription.event_type)
-        .bind(subscription.gh_app_installation_id)
+        .bind(&subscription_payload.target_repo)
+        .bind(&subscription_payload.event_type)
+        .bind(subscription_payload.gh_app_installation_id)
         .fetch_one(&mut *transaction)
         .await
         .map_err(RepositoryError::Database)?;
@@ -142,7 +143,14 @@ impl SubscriptionRepository for SqliteRepository {
             .commit()
             .await
             .map_err(RepositoryError::Database)?;
-        Ok(subscription)
+
+        Ok(SubscriptionWithBranch {
+            subscription,
+            source_branch: crate::model::SourceBranchInfo {
+                repo_url: subscription_payload.source_repo_url.clone(),
+                name: subscription_payload.source_branch_name.clone(),
+            },
+        })
     }
 
     async fn get_by_id(&self, id: i64) -> Result<Option<Subscription>, RepositoryError> {
@@ -151,6 +159,45 @@ impl SubscriptionRepository for SqliteRepository {
             .fetch_optional(&self.pool)
             .await
             .map_err(RepositoryError::Database)
+    }
+
+    async fn get_by_id_with_branch(
+        &self,
+        id: i64,
+    ) -> Result<Option<SubscriptionWithBranch>, RepositoryError> {
+        let row = sqlx::query!(
+            "SELECT s.*, b.repo_url as branch_repo_url, b.name as branch_name \
+             FROM subscriptions s \
+             JOIN branches b ON s.branch_id = b.id \
+             WHERE s.id = ?",
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(RepositoryError::Database)?;
+
+        match row {
+            Some(row) => Ok(Some(SubscriptionWithBranch {
+                subscription: Subscription {
+                    id: row.id,
+                    branch_id: row.branch_id,
+                    target_repo: crate::domain::TargetRepo::new(row.target_repo)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                    event_type: crate::domain::EventType::new(row.event_type)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                    gh_app_installation_id: row.gh_app_installation_id,
+                    created_at: row.created_at.and_utc(),
+                    updated_at: row.updated_at.and_utc(),
+                },
+                source_branch: crate::model::SourceBranchInfo {
+                    repo_url: crate::domain::RepoUrl::new(row.branch_repo_url)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                    name: crate::domain::BranchName::new(row.branch_name)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                },
+            })),
+            None => Ok(None),
+        }
     }
 
     async fn list_paginated(
@@ -166,6 +213,50 @@ impl SubscriptionRepository for SqliteRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(RepositoryError::Database)
+    }
+
+    async fn list_paginated_with_branches(
+        &self,
+        last_id: i64,
+        limit: i64,
+    ) -> Result<Vec<SubscriptionWithBranch>, RepositoryError> {
+        let rows = sqlx::query!(
+            "SELECT s.*, b.repo_url as branch_repo_url, b.name as branch_name \
+             FROM subscriptions s \
+             JOIN branches b ON s.branch_id = b.id \
+             WHERE s.id > ? ORDER BY s.id ASC LIMIT ?",
+            last_id,
+            limit
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(RepositoryError::Database)?;
+
+        let subscriptions: Result<Vec<SubscriptionWithBranch>, RepositoryError> = rows
+            .into_iter()
+            .map(|row| {
+                Ok(SubscriptionWithBranch {
+                    subscription: Subscription {
+                        id: row.id,
+                        branch_id: row.branch_id,
+                        target_repo: crate::domain::TargetRepo::new(row.target_repo)
+                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                        event_type: crate::domain::EventType::new(row.event_type)
+                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                        gh_app_installation_id: row.gh_app_installation_id,
+                        created_at: row.created_at.and_utc(),
+                        updated_at: row.updated_at.and_utc(),
+                    },
+                    source_branch: crate::model::SourceBranchInfo {
+                        repo_url: crate::domain::RepoUrl::new(row.branch_repo_url)
+                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                        name: crate::domain::BranchName::new(row.branch_name)
+                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                    },
+                })
+            })
+            .collect();
+        subscriptions
     }
 
     async fn count_remaining(&self, last_id: i64) -> Result<i64, RepositoryError> {
