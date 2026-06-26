@@ -45,6 +45,10 @@ fn map_to_hal(subscription: Subscription) -> SubscriptionHal {
 /// # Responses
 ///
 /// 201: Json<SubscriptionHal> - Subscription created successfully
+/// 401: () - Unauthorized
+/// 408: () - Request timeout
+/// 422: () - Validation error
+/// 500: () - Internal server error
 ///
 /// # Metadata
 ///
@@ -94,6 +98,9 @@ pub struct ListSubscriptionsQuery {
 /// # Responses
 ///
 /// 200: Json<SubscriptionPage> - Paginated list of subscriptions
+/// 401: () - Unauthorized
+/// 408: () - Request timeout
+/// 500: () - Internal server error
 ///
 /// # Metadata
 ///
@@ -151,7 +158,10 @@ async fn list_subscriptions_inner(
 /// # Responses
 ///
 /// 200: Json<SubscriptionHal> - Successfully retrieved the subscription
+/// 401: () - Unauthorized
 /// 404: () - Subscription was not found
+/// 408: () - Request timeout
+/// 500: () - Internal server error
 ///
 /// # Metadata
 ///
@@ -189,7 +199,11 @@ async fn get_subscription_inner(
 /// # Responses
 ///
 /// 200: Json<SubscriptionHal> - Subscription updated successfully
+/// 401: () - Unauthorized
 /// 404: () - Subscription was not found
+/// 408: () - Request timeout
+/// 422: () - Validation error
+/// 500: () - Internal server error
 ///
 /// # Metadata
 ///
@@ -226,7 +240,10 @@ async fn update_subscription_inner(
 /// # Responses
 ///
 /// 204: () - Subscription deleted successfully
+/// 401: () - Unauthorized
 /// 404: () - Subscription was not found
+/// 408: () - Request timeout
+/// 500: () - Internal server error
 ///
 /// # Metadata
 ///
