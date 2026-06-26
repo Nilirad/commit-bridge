@@ -78,21 +78,7 @@ async fn create_subscription_inner(
         sub_with_branch.subscription
     );
 
-    Ok(Json(SubscriptionHal {
-        subscription: sub_with_branch.subscription.clone(),
-        source_branch: sub_with_branch.source_branch,
-        links: SubscriptionLinks {
-            self_link: HalLink {
-                href: format!("/subscriptions/{}", sub_with_branch.subscription.id),
-            },
-            update: HalLink {
-                href: format!("/subscriptions/{}", sub_with_branch.subscription.id),
-            },
-            delete: HalLink {
-                href: format!("/subscriptions/{}", sub_with_branch.subscription.id),
-            },
-        },
-    }))
+    Ok(Json(map_to_hal(sub_with_branch)))
 }
 
 /// Query parameters for listing subscriptions.
@@ -148,27 +134,7 @@ async fn list_subscriptions_inner(
         .list_paginated_with_branches(last_id, limit as i64)
         .await?;
 
-    let data: Vec<SubscriptionHal> = subscriptions
-        .into_iter()
-        .map(|s| {
-            let id = s.subscription.id;
-            SubscriptionHal {
-                subscription: s.subscription,
-                source_branch: s.source_branch,
-                links: SubscriptionLinks {
-                    self_link: HalLink {
-                        href: format!("/subscriptions/{}", id),
-                    },
-                    update: HalLink {
-                        href: format!("/subscriptions/{}", id),
-                    },
-                    delete: HalLink {
-                        href: format!("/subscriptions/{}", id),
-                    },
-                },
-            }
-        })
-        .collect();
+    let data: Vec<SubscriptionHal> = subscriptions.into_iter().map(map_to_hal).collect();
 
     let next_id = data.last().map(|s| s.subscription.id).unwrap_or(last_id);
     let remaining_count = state.repository.count_remaining(next_id).await?;
