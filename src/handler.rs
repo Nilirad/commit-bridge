@@ -107,7 +107,7 @@ pub struct ListSubscriptionsQuery {
 ///
 /// # Query Parameters
 ///
-/// - `limit`: The maximum number of subscriptions to return (default: 50, max: 100).
+/// - `limit`: The maximum number of subscriptions to return.
 /// - `last_id`: The ID of the last subscription in the previous page.
 ///
 /// # Responses
