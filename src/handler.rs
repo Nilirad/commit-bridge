@@ -71,8 +71,11 @@ async fn create_subscription_inner(
     let sub_with_branch = state.repository.create(&payload).await?;
 
     info!(
-        "Registered new subscription for branch ID {}: {:?}",
-        sub_with_branch.subscription.branch_id, sub_with_branch.subscription
+        "Registered new subscription for branch ID {} (repo: {}, branch: {}): {:?}",
+        sub_with_branch.subscription.branch_id,
+        sub_with_branch.source_branch.repo_url,
+        sub_with_branch.source_branch.name,
+        sub_with_branch.subscription
     );
 
     Ok(Json(SubscriptionHal {

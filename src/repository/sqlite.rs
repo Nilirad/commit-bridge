@@ -1,5 +1,6 @@
 //! SQLite implementation of the repository.
 
+use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
 use crate::model::{
     Branch, CreateSubscription, Subscription, SubscriptionWithBranch, TriggerQueueItem,
     UpdateSubscription,
@@ -200,6 +201,49 @@ impl SubscriptionRepository for SqliteRepository {
         }
     }
 
+    async fn get_by_keys_with_branch(
+        &self,
+        branch_id: i64,
+        target_repo: &TargetRepo,
+        event_type: &EventType,
+    ) -> Result<Option<SubscriptionWithBranch>, RepositoryError> {
+        let row = sqlx::query!(
+            "SELECT s.*, b.repo_url as branch_repo_url, b.name as branch_name \
+             FROM subscriptions s \
+             JOIN branches b ON s.branch_id = b.id \
+             WHERE s.branch_id = ? AND s.target_repo = ? AND s.event_type = ?",
+            branch_id,
+            target_repo,
+            event_type
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(RepositoryError::Database)?;
+
+        match row {
+            Some(row) => Ok(Some(SubscriptionWithBranch {
+                subscription: Subscription {
+                    id: row.id,
+                    branch_id: row.branch_id,
+                    target_repo: crate::domain::TargetRepo::new(row.target_repo)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                    event_type: crate::domain::EventType::new(row.event_type)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                    gh_app_installation_id: row.gh_app_installation_id,
+                    created_at: row.created_at.and_utc(),
+                    updated_at: row.updated_at.and_utc(),
+                },
+                source_branch: crate::model::SourceBranchInfo {
+                    repo_url: crate::domain::RepoUrl::new(row.branch_repo_url)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                    name: crate::domain::BranchName::new(row.branch_name)
+                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                },
+            })),
+            None => Ok(None),
+        }
+    }
+
     async fn list_paginated(
         &self,
         last_id: i64,
@@ -239,18 +283,18 @@ impl SubscriptionRepository for SqliteRepository {
                     subscription: Subscription {
                         id: row.id,
                         branch_id: row.branch_id,
-                        target_repo: crate::domain::TargetRepo::new(row.target_repo)
+                        target_repo: TargetRepo::new(row.target_repo)
                             .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                        event_type: crate::domain::EventType::new(row.event_type)
+                        event_type: EventType::new(row.event_type)
                             .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
                         gh_app_installation_id: row.gh_app_installation_id,
                         created_at: row.created_at.and_utc(),
                         updated_at: row.updated_at.and_utc(),
                     },
                     source_branch: crate::model::SourceBranchInfo {
-                        repo_url: crate::domain::RepoUrl::new(row.branch_repo_url)
+                        repo_url: RepoUrl::new(row.branch_repo_url)
                             .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                        name: crate::domain::BranchName::new(row.branch_name)
+                        name: BranchName::new(row.branch_name)
                             .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
                     },
                 })
@@ -394,8 +438,8 @@ impl TriggerRepository for SqliteRepository {
         &self,
     ) -> Result<Option<TriggerQueueItem>, RepositoryError> {
         let trigger = sqlx::query_as::<_, TriggerQueueItem>(
-            "UPDATE trigger_queue 
-             SET status = 'PROCESSING', status_updated_at = CURRENT_TIMESTAMP 
+            "UPDATE trigger_queue
+             SET status = 'PROCESSING', status_updated_at = CURRENT_TIMESTAMP
              WHERE id = (
                  SELECT id FROM trigger_queue
                  WHERE status IN ('PENDING') AND next_retry_at <= CURRENT_TIMESTAMP

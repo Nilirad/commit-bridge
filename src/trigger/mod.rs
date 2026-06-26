@@ -7,8 +7,11 @@ use tracing::{info, warn};
 use crate::{
     context::SharedContext,
     engine::AsyncEngine,
-    model::{Subscription, TriggerQueueItem},
-    repository::trigger::{TriggerRepository, UpdateRetryStatus},
+    model::{SubscriptionWithBranch, TriggerQueueItem},
+    repository::{
+        subscription::SubscriptionRepository,
+        trigger::{TriggerRepository, UpdateRetryStatus},
+    },
     trigger::error::{RequestError, WorkflowTriggerError},
 };
 
@@ -65,7 +68,7 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
     let dispatch_result = dispatch_events(engine, &trigger).await;
     match dispatch_result {
         Ok(_) => {
-            engine.ctx.repository.delete_by_id(trigger.id).await?;
+            TriggerRepository::delete_by_id(&*engine.ctx.repository, trigger.id).await?;
         }
         Err(e) => {
             warn!("Dispatch failed: {e}");
@@ -125,54 +128,63 @@ pub async fn recover_stuck_tasks(
 }
 
 /// Sends a `repository_dispatch` event for each relevant [`Subscription`].
+///
+/// <!-- LINKS -->
+/// [`Subscription`]: crate::model::Subscription
 pub async fn dispatch_events(
     engine: &TriggerEngine,
     trigger: &TriggerQueueItem,
 ) -> Result<(), WorkflowTriggerError> {
-    info!(
-        "Received update event for branch {}: {}",
-        trigger.branch_id, trigger.new_hash
-    );
+    let sub_with_branch = engine
+        .ctx
+        .repository
+        .get_by_keys_with_branch(trigger.branch_id, &trigger.target_repo, &trigger.event_type)
+        .await?
+        .ok_or_else(|| {
+            WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)
+        })?;
 
-    // TODO: Create a subscription DTO that doesn't contain
-    // `id`, `created_at` and `updated_at`.
-    let sub = Subscription {
-        id: 0,
-        branch_id: trigger.branch_id,
-        target_repo: trigger.target_repo.clone(),
-        event_type: trigger.event_type.clone(),
-        gh_app_installation_id: trigger.gh_app_installation_id,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
-    };
+    info!(
+        "Received update event for branch {} (repo: {}, branch: {}): {}",
+        trigger.branch_id,
+        sub_with_branch.source_branch.repo_url,
+        sub_with_branch.source_branch.name,
+        trigger.new_hash
+    );
 
     let iat = engine
         .authenticator
-        .request_installation_token(&sub)
+        .request_installation_token(&sub_with_branch.subscription)
         .await?;
-    notify_subscription(engine, iat, trigger, sub).await?;
+    notify_subscription(engine, iat, trigger, sub_with_branch).await?;
 
     Ok(())
 }
 
 /// Manages IAT authentication,
 /// and sends a `repository_dispatch` event to the specified [`Subscription`].
+///
+/// <!-- LINKS -->
+/// [`Subscription`]: crate::model::Subscription
 async fn notify_subscription(
     engine: &TriggerEngine,
     iat: String,
     trigger: &TriggerQueueItem,
-    sub: Subscription,
+    sub_with_branch: SubscriptionWithBranch,
 ) -> Result<(), WorkflowTriggerError> {
-    send_repository_dispatch(engine, &iat, trigger, &sub).await?;
+    send_repository_dispatch(engine, &iat, trigger, &sub_with_branch).await?;
     Ok(())
 }
 
 /// Sends a `repository_dispatch` event to the specified [`Subscription`].
+///
+/// <!-- LINKS -->
+/// [`Subscription`]: crate::model::Subscription
 async fn send_repository_dispatch(
     engine: &TriggerEngine,
     iat: &str,
     trigger: &TriggerQueueItem,
-    sub: &Subscription,
+    sub_with_branch: &SubscriptionWithBranch,
 ) -> Result<(), WorkflowTriggerError> {
     let api_url = format!(
         "{}/repos/{}/dispatches",
@@ -183,18 +195,26 @@ async fn send_repository_dispatch(
             .base_url
             .as_str()
             .trim_end_matches('/'),
-        sub.target_repo
+        sub_with_branch.subscription.target_repo
     );
 
     let payload = serde_json::json!({
-        "event_type": sub.event_type,
+        "event_type": sub_with_branch.subscription.event_type,
         "client_payload": {
             "branch_id": trigger.branch_id.to_string(),
-            "new_commit_hash": trigger.new_hash
-       }
+            "new_commit_hash": trigger.new_hash,
+            "source_repo": sub_with_branch.source_branch.repo_url.to_string(),
+            "source_branch": sub_with_branch.source_branch.name.to_string(),
+        }
     });
 
-    info!("Sending payload to {}: {}", sub.target_repo, payload);
+    info!(
+        "Sending payload to {} (Source repo: {}, Tracked branch: {}): {}",
+        sub_with_branch.subscription.target_repo,
+        sub_with_branch.source_branch.repo_url,
+        sub_with_branch.source_branch.name,
+        payload
+    );
 
     let response = engine
         .http_client
@@ -214,8 +234,11 @@ async fn send_repository_dispatch(
 
     if response.status().is_success() {
         info!(
-            "`repository_dispatch` sent to {}: Event: {}",
-            sub.target_repo, sub.event_type
+            "`repository_dispatch` sent to {} (Source repo: {}, Tracked branch: {}): Event: {}",
+            sub_with_branch.subscription.target_repo,
+            sub_with_branch.source_branch.repo_url,
+            sub_with_branch.source_branch.name,
+            sub_with_branch.subscription.event_type
         );
         Ok(())
     } else {
