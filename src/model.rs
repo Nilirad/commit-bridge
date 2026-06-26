@@ -3,6 +3,15 @@
 //! The `Create_` `struct`s represent the payload
 //! to create the corresponding row.
 
+// FIXME: Some docstrings have been duplicated.
+// Maybe this problem can be solved by including an external Markdown file.
+// For example:
+//
+// ```rust
+// #[doc = include_str!("docs/my_struct.md")]
+// pub struct MyStruct { ... }
+// ```
+
 use crate::domain::{BranchName, CommitHash, EventType, RepoUrl, TargetRepo};
 use chrono::{DateTime, Utc};
 use rovo::schemars::JsonSchema;
@@ -118,32 +127,48 @@ pub struct SubscriptionHal {
 /// Holds payload data for the creation of a [`Subscription`].
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct CreateSubscription {
-    /// Determines the value of [`Branch::repo_url`].
+    /// Full HTTPS URL of the monitored git repository.
     pub source_repo_url: RepoUrl,
 
-    /// Determines the value of [`Branch::name`].
+    /// Name of the git branch to poll.
     pub source_branch_name: BranchName,
 
-    /// Determines the value of [`Subscription::target_repo`].
+    /// The repository whose workflow needs to be triggered.
     pub target_repo: TargetRepo,
 
-    /// Determines the value of [`Subscription::event_type`].
+    /// Identifies the specific [`repository_dispatch`] event.
+    ///
+    /// The values must contain at most 100 characters.
+    ///
+    /// <!-- LINKS -->
+    /// [`repository_dispatch`]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch
     pub event_type: EventType,
 
-    /// Determines the value of [`Subscription::gh_app_installation_id`].
+    /// Allows authenticating as a [GitHub App installation][gh_app_auth].
+    ///
+    /// <!-- LINKS -->
+    /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
     pub gh_app_installation_id: i64,
 }
 
 /// Holds payload data for the update of a [`Subscription`].
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateSubscription {
-    /// Determines the value of [`Subscription::target_repo`].
+    /// The repository whose workflow needs to be triggered.
     pub target_repo: Option<TargetRepo>,
 
-    /// Determines the value of [`Subscription::event_type`].
+    /// Identifies the specific [`repository_dispatch`] event.
+    ///
+    /// The values must contain at most 100 characters.
+    ///
+    /// <!-- LINKS -->
+    /// [`repository_dispatch`]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch
     pub event_type: Option<EventType>,
 
-    /// Determines the value of [`Subscription::gh_app_installation_id`].
+    /// Allows authenticating as a [GitHub App installation][gh_app_auth].
+    ///
+    /// <!-- LINKS -->
+    /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
     pub gh_app_installation_id: Option<i64>,
 }
 
