@@ -101,6 +101,12 @@ and prepare the necessary paths for your GitHub App private key (`RELAY__AUTH__P
 Finally,
 follow one of the three options below.
 
+> [!warning]
+> `.env` files are only suggested for development environments.
+> In production environments,
+> storing the `.env` file might introduce security risks.
+> Therefore, always prefer storing configuration in system environment variables.
+
 ### Docker deployment
 
 For containerized deployment,
