@@ -1,0 +1,28 @@
+name: Security Audit
+
+on:
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  deny:
+    name: Deny
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Advisories (Production Only)
+        run: cargo deny --exclude-dev check advisories
+      - name: Check Bans, Licenses, and Sources (All)
+        run: cargo deny check bans licenses sources
