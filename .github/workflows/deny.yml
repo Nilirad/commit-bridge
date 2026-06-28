@@ -1,0 +1,34 @@
+name: Security Audit
+
+on:
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  deny:
+    name: Deny
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Advisories
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check --exclude-dev advisories
+
+      - name: Bans, Licenses, and Sources
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check bans licenses sources
