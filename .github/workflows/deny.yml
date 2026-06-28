@@ -22,7 +22,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Check Advisories (Production Only)
-        run: cargo deny --exclude-dev check advisories
-      - name: Check Bans, Licenses, and Sources (All)
-        run: cargo deny check bans licenses sources
+
+      - name: Advisories
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check --exclude-dev advisories
+
+      - name: Bans, Licenses, and Sources
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check bans licenses sources
