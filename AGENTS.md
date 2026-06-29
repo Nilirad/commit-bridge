@@ -17,7 +17,7 @@ This file contains crucial context for AI agents working in this repository.
 
 ## Environment & Setup
 - **Nix First**: The project uses Nix flakes (`flake.nix`) and `direnv`. Agents should rely on `nix develop` to get the proper Rust toolchain, `sqlx-cli`, and wrapped `cargo` commands.
-- **Runtime Variables**: To run the server locally, you must ensure `GH_CLIENT_ID` and `GH_APP_KEY_PATH` are set (pointing to a valid GitHub App private key).
+- **Runtime Variables**: To run the server locally, you must ensure `CBRIDGE__AUTH__CLIENT_ID` and `CBRIDGE__AUTH__PEM_PATH` are set (pointing to a valid GitHub App private key).
 - **External Dependencies**: The application shells out to `git ls-remote` at runtime, so `git` must be available in the environment.
 
 ## Architecture
