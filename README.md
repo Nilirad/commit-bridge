@@ -4,6 +4,20 @@
   <em>Seamless workflow dispatch for remote git dependencies.</em>
 </p>
 
+<p align="center">
+  <a href="https://github.com/Nilirad/commit-bridge/actions/workflows/ci.yml"><img src="https://github.com/Nilirad/commit-bridge/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>&nbsp;
+  <a href="https://github.com/Nilirad/commit-bridge/actions/workflows/deny.yml"><img src="https://github.com/Nilirad/commit-bridge/actions/workflows/deny.yml/badge.svg" alt="Security Audit"></a>&nbsp;
+  <a href="https://github.com/Nilirad/commit-bridge/blob/main/Cargo.toml"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg" alt="Dual License"></a>
+</p>
+
+<p align="center">
+  <a href="https://crates.io/crates/commit-bridge"><img src="https://img.shields.io/crates/v/commit-bridge.svg" alt="Crates.io Version"></a>&nbsp;
+  <a href="https://docs.rs/commit-bridge"><img src="https://docs.rs/commit-bridge/badge.svg" alt="Docs.rs Status"></a>&nbsp;
+  <a href="https://hub.docker.com/r/Nilirad/commit-bridge"><img src="https://img.shields.io/docker/v/Nilirad/commit-bridge?sort=semver&logo=docker" alt="Docker Image"></a>
+</p>
+
+---
+
 Triggering a repository workflow
 in response to a commit on a different repository is not a trivial problem.
 This is particularly useful for projects that have git dependencies,
