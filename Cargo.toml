@@ -3,6 +3,9 @@ name = "commit-bridge"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+description = "Seamless workflow dispatch for remote git dependencies."
+documentation = "https://docs.rs/commit-bridge"
+repository = "https://github.com/Nilirad/commit-bridge"
 
 [dependencies]
 async-trait = "0.1"
