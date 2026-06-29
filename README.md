@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://crates.io/crates/commit-bridge"><img src="https://img.shields.io/crates/v/commit-bridge.svg" alt="Crates.io Version"></a>&nbsp;
   <a href="https://docs.rs/commit-bridge"><img src="https://docs.rs/commit-bridge/badge.svg" alt="Docs.rs Status"></a>&nbsp;
-  <a href="https://hub.docker.com/r/Nilirad/commit-bridge"><img src="https://img.shields.io/docker/v/Nilirad/commit-bridge?sort=semver&logo=docker" alt="Docker Image"></a>
+  <a href="https://hub.docker.com/r/nilirad/commit-bridge"><img src="https://img.shields.io/docker/v/nilirad/commit-bridge?sort=semver&logo=docker" alt="Docker Image"></a>
 </p>
 
 ---
