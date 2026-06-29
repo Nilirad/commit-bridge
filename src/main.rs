@@ -8,7 +8,7 @@
     clippy::indexing_slicing
 )]
 
-use relay::run_app;
+use commit_bridge::run_app;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 

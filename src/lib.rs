@@ -210,7 +210,7 @@ mod health_handler {
     use super::*;
     #[rovo]
     pub async fn health_check(State(_state): State<AppState>) -> &'static str {
-        "Relay Server is alive"
+        "CommitBridge is alive"
     }
 }
 
@@ -227,7 +227,7 @@ pub fn build_router(
     };
 
     let mut api = OpenApi::default();
-    api.info.title = "Relay API".to_string();
+    api.info.title = "CommitBridge API".to_string();
     api.info.description =
         Some("API for managing repository subscriptions and triggering workflows".to_string());
 

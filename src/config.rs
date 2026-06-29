@@ -48,7 +48,7 @@ impl Config {
             );
         }
 
-        let environment = Environment::with_prefix("RELAY")
+        let environment = Environment::with_prefix("CBRIDGE")
             .separator("__")
             .try_parsing(true);
 
@@ -62,7 +62,7 @@ impl Config {
         if config.auth.allow_unauthenticated {
             tracing::warn!(
                 "API AUTHENTICATION DISABLED. \
-                Please do not set `RELAY__AUTH__ALLOW_UNAUTHENTICATED=true` \
+                Please do not set `CBRIDGE__AUTH__ALLOW_UNAUTHENTICATED=true` \
                 on production environments."
             );
         }

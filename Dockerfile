@@ -13,16 +13,16 @@ COPY --from=planner /app/recipe.json recipe.json
 ENV SQLX_OFFLINE=true
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN cargo build --release --bin relay
+RUN cargo build --release --bin commit-bridge
 
 FROM debian:bookworm-slim AS final
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/relay /usr/local/bin/relay
-ENV RELAY__DATABASE__URL="sqlite:///app/data/relay.db?mode=rwc"
+COPY --from=builder /app/target/release/commit-bridge /usr/local/bin/commit-bridge
+ENV CBRIDGE__DATABASE__URL="sqlite:///app/data/commit-bridge.db?mode=rwc"
 VOLUME ["/app/data"]
 EXPOSE 3000
 WORKDIR /app/data
-CMD ["relay"]
+CMD ["commit-bridge"]

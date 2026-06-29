@@ -1,4 +1,4 @@
-# Agent Instructions for `relay`
+# Agent Instructions for `commit-bridge`
 
 This file contains crucial context for AI agents working in this repository.
 

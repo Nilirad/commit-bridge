@@ -1,4 +1,22 @@
-# Relay Server
+<h1 align="center">CommitBridge</h1>
+
+<p align="center">
+  <em>Seamless workflow dispatch for remote git dependencies.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Nilirad/commit-bridge/actions/workflows/ci.yml"><img src="https://github.com/Nilirad/commit-bridge/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>&nbsp;
+  <a href="https://github.com/Nilirad/commit-bridge/actions/workflows/deny.yml"><img src="https://github.com/Nilirad/commit-bridge/actions/workflows/deny.yml/badge.svg" alt="Security Audit"></a>&nbsp;
+  <a href="https://github.com/Nilirad/commit-bridge/blob/main/Cargo.toml"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg" alt="Dual License"></a>
+</p>
+
+<p align="center">
+  <a href="https://crates.io/crates/commit-bridge"><img src="https://img.shields.io/crates/v/commit-bridge.svg" alt="Crates.io Version"></a>&nbsp;
+  <a href="https://docs.rs/commit-bridge"><img src="https://docs.rs/commit-bridge/badge.svg" alt="Docs.rs Status"></a>&nbsp;
+  <a href="https://hub.docker.com/r/Nilirad/commit-bridge"><img src="https://img.shields.io/docker/v/Nilirad/commit-bridge?sort=semver&logo=docker" alt="Docker Image"></a>
+</p>
+
+---
 
 Triggering a repository workflow
 in response to a commit on a different repository is not a trivial problem.
@@ -49,7 +67,7 @@ from other `repository_dispatch` events.
 Clone this repository:
 
 ```shell
-git clone https://github.com/Nilirad/relay.git
+git clone https://github.com/Nilirad/commit-bridge.git
 ```
 
 Then,
@@ -96,8 +114,8 @@ cp .env.example .env
 ```
 
 Then,
-edit the `.env` file to add your GitHub App's client id (`RELAY__AUTH__CLIENT_ID`)
-and prepare the necessary paths for your GitHub App private key (`RELAY__AUTH__PEM_PATH`).
+edit the `.env` file to add your GitHub App's client id (`CBRIDGE__AUTH__CLIENT_ID`)
+and prepare the necessary paths for your GitHub App private key (`CBRIDGE__AUTH__PEM_PATH`).
 Finally,
 follow one of the three options below.
 
@@ -176,7 +194,7 @@ cargo run --release
 
 By default, this server mandates authentication for all `/subscriptions` endpoints.
 
-1. **Configure:** Set the `RELAY__AUTH__API_KEY` environment variable to a secure value in your `.env` file.
+1. **Configure:** Set the `CBRIDGE__AUTH__API_KEY` environment variable to a secure value in your `.env` file.
 2. **Authenticate:** Include the key in the `X-API-KEY` header for all requests:
 
     ```shell
@@ -192,7 +210,7 @@ Note that while this protects against key content discovery,
 an attacker may still be able to infer the length of the API key
 by measuring response times.
 For maximum security,
-ensure that your `RELAY__AUTH__API_KEY` is long
+ensure that your `CBRIDGE__AUTH__API_KEY` is long
 and generated using a cryptographically secure random source.
 
 ### Disabling Authentication (Not Recommended)
@@ -206,7 +224,7 @@ If you require an unauthenticated setup for rapid local prototyping,
 you can explicitly opt-in by setting the following environment variable:
 
 ```text
-RELAY__AUTH__ALLOW_UNAUTHENTICATED=true
+CBRIDGE__AUTH__ALLOW_UNAUTHENTICATED=true
 ```
 
 ## License

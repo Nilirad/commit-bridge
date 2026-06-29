@@ -1,9 +1,9 @@
 use dudect_bencher::{BenchRng, Class, CtRunner, ctbench_main};
 
+use commit_bridge::domain::NonEmptyString;
+use commit_bridge::verify_api_key;
 use dudect_bencher::rand::RngExt;
 use rand::distr::{Alphanumeric, SampleString};
-use relay::domain::NonEmptyString;
-use relay::verify_api_key;
 
 fn bench_verify_api_key(runner: &mut CtRunner, rng: &mut BenchRng) {
     const SET_SIZE: usize = 100_000;
