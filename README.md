@@ -64,15 +64,8 @@ It is used to distinguish the event
 from other `repository_dispatch` events.
 
 **Run the server.**
-Clone this repository:
-
-```shell
-git clone https://github.com/Nilirad/commit-bridge.git
-```
-
-Then,
-follow the instructions in the **"Setup"** section
-to run the server.
+Follow the instructions in the **"Setup"** and **"Security"** sections
+to install and run the server (such as via Docker, Cargo, or Nix).
 
 **Populate the database.**
 Populate the database with the subscriptions you need.
@@ -107,42 +100,83 @@ and trigger your workflow shortly after a new commit is pushed
 ## Setup
 
 First,
-create your `.env` file by copying the example:
+create a `.env` file with your GitHub App configuration
+or set the corresponding environment variables:
+
+- `CBRIDGE__AUTH__CLIENT_ID`: Your GitHub App's Client ID.
+- `CBRIDGE__AUTH__PEM_PATH`: The path to your GitHub App private key.
+
+If you have cloned the repository,
+you can copy the example file:
 
 ```shell
 cp .env.example .env
 ```
 
 Then,
-edit the `.env` file to add your GitHub App's client id (`CBRIDGE__AUTH__CLIENT_ID`)
-and prepare the necessary paths for your GitHub App private key (`CBRIDGE__AUTH__PEM_PATH`).
-Finally,
-follow one of the three options below.
+follow one of the installation options below.
 
 > [!warning]
 > `.env` files are only suggested for development environments.
 > In production environments,
-> storing the `.env` file might introduce security risks.
-> Therefore, always prefer storing configuration in system environment variables.
+> storing the `.env` file beside the server might introduce security risks.
+> Therefore, always prefer storing configuration in system environment variables,
+> or keeping the `.env` file separated from the server.
 
 ### Docker deployment
 
 For containerized deployment,
-use the provided `docker-compose.yaml.example`:
+you can use the pre-built Docker image from Docker Hub.
+Create a `docker-compose.yaml`
+by copying the example in this repository
+or using the template below:
 
-```shell
-cp docker-compose.yaml.example docker-compose.yaml
+```yaml
+services:
+  commit-bridge:
+    image: nilirad/commit-bridge:latest
+    container_name: commit-bridge-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - commit_bridge_data:/app/data
+      - ./YOUR_PEM_FILE.pem:/app/data/YOUR_PEM_FILE.pem:ro
+    env_file:
+      - .env
+
+volumes:
+  commit_bridge_data:
 ```
 
-Ensure the path to your GitHub App private key
-is correctly mapped in `docker-compose.yaml`,
-then build and start the container:
+Ensure that your private key file
+(`./YOUR_PEM_FILE.pem` in the example above)
+exists on the host machine before launching the container
+to prevent Docker from auto-creating it as an empty directory.
+Once the path is correctly mapped,
+start the container:
 
 ```shell
 docker compose up -d
 ```
 
-### Nix flake
+### Cargo installation
+
+You can install and run the server directly from [crates.io]:
+
+```shell
+cargo install commit-bridge
+```
+
+Ensure `git` is installed (runtime dependency)
+and that your environment variables or `.env` are configured.
+Then, launch the server:
+
+```shell
+commit-bridge
+```
+
+### Nix flake (development)
 
 [`Nix`] is recommended
 to set up the development environment.
@@ -164,7 +198,7 @@ cargo run --release
 nix run
 ```
 
-### Manual setup
+### Manual setup (from source)
 
 If you prefer not to use Nix or a container,
 you can build and run this server
@@ -189,6 +223,7 @@ cargo run --release
 [`nix-direnv`]: https://github.com/nix-community/nix-direnv
 [flakes are enabled]: https://nixos.wiki/wiki/Flakes
 [Rust]: https://rust-lang.org/learn/get-started/
+[crates.io]: https://crates.io/crates/commit-bridge
 
 ## Security
 
