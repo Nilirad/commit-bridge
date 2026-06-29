@@ -1,4 +1,8 @@
-# CommitBridge
+<h1 align="center">CommitBridge</h1>
+
+<p align="center">
+  <em>Seamless workflow dispatch for remote git dependencies.</em>
+</p>
 
 Triggering a repository workflow
 in response to a commit on a different repository is not a trivial problem.
