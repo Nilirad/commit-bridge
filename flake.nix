@@ -103,11 +103,11 @@
 
             shellHook = ''
               echo "Rust dev shell ready (Rust $(rustc --version))"
-              export DATABASE_URL="sqlite://relay.db?mode=rwc"
+              export DATABASE_URL="sqlite://commit-bridge.db?mode=rwc"
             '';
           };
         packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "relay";
+          pname = "commit-bridge";
           version = "0.1.0";
           src = ./.;
           cargoLock = {

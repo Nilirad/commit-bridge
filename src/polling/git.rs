@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_extract_hash_success() {
         let stdout = b"678c4343237127dbadbf1806dd98b2154ffd2ebe\trefs/heads/main\n".to_vec();
-        let repo_url = "https://github.com/Nilirad/relay".to_string();
+        let repo_url = "https://github.com/Nilirad/commit-bridge".to_string();
         let branch = "main".to_string();
 
         let result = extract_hash(stdout, repo_url, branch);
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_extract_hash_empty_output() {
         let stdout = b"".to_vec();
-        let repo_url = "https://github.com/Nilirad/relay".to_string();
+        let repo_url = "https://github.com/Nilirad/commit-bridge".to_string();
         let branch = "main".to_string();
 
         let result = extract_hash(stdout.clone(), repo_url.clone(), branch.clone());
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn test_extract_hash_whitespace_only() {
         let stdout = b"   \n\t ".to_vec();
-        let repo_url = "https://github.com/Nilirad/relay".to_string();
+        let repo_url = "https://github.com/Nilirad/commit-bridge".to_string();
         let branch = "main".to_string();
 
         let result = extract_hash(stdout.clone(), repo_url.clone(), branch.clone());

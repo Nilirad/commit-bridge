@@ -1,15 +1,15 @@
 services:
-  relay:
+  commit-bridge:
     build:
       context: .
       dockerfile: Dockerfile
-    image: nilirad/relay:latest
-    container_name: relay-server
+    image: nilirad/commit-bridge:latest
+    container_name: commit-bridge-server
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
-      - relay_data:/app/data
+      - commit_bridge_data:/app/data
       - ./YOUR_PEM_FILE.pem:/app/data/YOUR_PEM_FILE.pem:ro
     env_file:
       - .env
@@ -23,4 +23,4 @@ services:
           path: Cargo.lock
 
 volumes:
-  relay_data:
+  commit_bridge_data:

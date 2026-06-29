@@ -1,5 +1,5 @@
 [package]
-name = "relay"
+name = "commit-bridge"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
@@ -13,7 +13,7 @@ dotenvy = "0.15.7"
 futures = "0.3.32"
 http = "1.4.2"
 humantime-serde = "1.1.1"
-jsonwebtoken = { version = "10.4.0" }
+jsonwebtoken = { version = "10.4.0", features = ["aws_lc_rs"] }
 reqwest = { version = "0.13.4", features = ["json"] }
 rovo = { version = "0.4.8", features = ["scalar"] }
 schemars = { version = "0.9", features = ["chrono04"] }
