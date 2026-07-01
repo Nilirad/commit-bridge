@@ -273,4 +273,80 @@ mod tests {
         assert_eq!(queued_events[0].branch_id, Some(1));
         assert_eq!(queued_events[0].new_hash, Some("c".repeat(40)));
     }
+
+    #[tokio::test]
+    async fn test_coalescing_of_trigger_events_multiple_branches() {
+        let pool = crate::test_utils::create_test_db().await;
+
+        // Insert first branch
+        let hash1 = "a".repeat(40);
+        sqlx::query!(
+            "INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)",
+            "https://github.com/owner/repo1",
+            "main",
+            hash1
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert first subscription
+        sqlx::query!("INSERT INTO subscriptions (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+            1,
+            "org/target",
+            "dispatch",
+            1
+        )
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Insert second branch
+        let hash2 = "b".repeat(40);
+        sqlx::query!(
+            "INSERT INTO branches (repo_url, name, last_commit_hash) VALUES (?, ?, ?)",
+            "https://github.com/owner/repo2",
+            "main",
+            hash2
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert second subscription with the same target repo and event type
+        sqlx::query!("INSERT INTO subscriptions (branch_id, target_repo, event_type, gh_app_installation_id) VALUES (?, ?, ?, ?)",
+            2,
+            "org/target",
+            "dispatch",
+            1
+        )
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let ctx = SharedContext {
+            config: crate::test_utils::create_test_config(),
+            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
+            db_pool: pool.clone(),
+            git_fetcher: std::sync::Arc::new(crate::test_utils::MockGitFetcher {
+                hash: CommitHash::new("c".repeat(40)).unwrap(),
+            }),
+            token: tokio_util::sync::CancellationToken::new(),
+        };
+
+        // Poll for both branches. The first branch updates to 'c'
+        // The second branch updates to 'c' and coalesces with the first one
+        poll_branches(&ctx).await.unwrap();
+
+        // Verify only one entry in queue
+        let queued_events = sqlx::query!("SELECT branch_id, new_hash FROM trigger_queue")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(queued_events.len(), 1);
+        // It should contain the last updated branch
+        assert_eq!(queued_events[0].branch_id, Some(2));
+        assert_eq!(queued_events[0].new_hash, Some("c".repeat(40)));
+    }
 }

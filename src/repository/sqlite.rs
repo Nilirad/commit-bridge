@@ -508,8 +508,8 @@ impl TriggerRepository for SqliteRepository {
              SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id
              FROM subscriptions s
              WHERE s.branch_id = ?
-             ON CONFLICT(branch_id, target_repo, event_type) WHERE status = 'PENDING'
-             DO UPDATE SET new_hash = excluded.new_hash, status_updated_at = CURRENT_TIMESTAMP",
+             ON CONFLICT(target_repo, event_type) WHERE status = 'PENDING'
+             DO UPDATE SET branch_id = excluded.branch_id, new_hash = excluded.new_hash, status_updated_at = CURRENT_TIMESTAMP",
             branch_id,
             new_hash,
             branch_id
