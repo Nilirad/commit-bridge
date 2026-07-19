@@ -3,16 +3,16 @@ name: Security Audit
 on:
   push:
     paths:
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - 'deny.toml'
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "deny.toml"
   pull_request:
     paths:
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - 'deny.toml'
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "deny.toml"
   schedule:
-    - cron: '0 0 * * 0'
+    - cron: "0 0 * * 0"
 
 jobs:
   deny:
@@ -26,7 +26,8 @@ jobs:
       - name: Advisories
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          command: check --exclude-dev advisories
+          command: check advisories
+          arguments: --config deny-advisories.toml
 
       - name: Bans, Licenses, and Sources
         uses: EmbarkStudios/cargo-deny-action@v2
