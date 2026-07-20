@@ -2,6 +2,4 @@
 exclude-dev = true
 
 [advisories]
-ignore = [
-    { id = "RUSTSEC-2026-0173", reason = "Introduced by `validator` crate. Just declared unmaintained." },
-]
+ignore = []
