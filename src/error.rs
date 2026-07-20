@@ -191,6 +191,10 @@ pub enum CommitHashError {
     // Error is boxed because it is very large
     RefMap(Box<gix::remote::ref_map::Error>),
 
+    /// Failed to parse refspec.
+    #[error("Failed to parse refspec: {0}")]
+    RefSpecParse(#[from] gix::refspec::parse::Error),
+
     /// Git operation failed using gix.
     #[error("Git operation failed: {0}")]
     Git(String),

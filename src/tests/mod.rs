@@ -9,3 +9,4 @@
 pub mod api_routes;
 pub mod auth_tests;
 pub mod config_tests;
+pub mod polling_tests;

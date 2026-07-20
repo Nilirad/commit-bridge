@@ -2,6 +2,8 @@
 
 use crate::{domain::CommitHash, error::CommitHashError};
 use async_trait::async_trait;
+use gix::progress::Discard;
+use gix::remote::Direction;
 
 /// Allows running git commands.
 #[async_trait]
@@ -19,13 +21,16 @@ pub struct MainGitFetcher {
     /// Gix repository handle.
     #[allow(dead_code)]
     repo: std::sync::Mutex<gix::Repository>,
+    /// Timeout duration for outgoing Git requests.
+    timeout: std::time::Duration,
 }
 
 impl MainGitFetcher {
     /// Creates a new `MainGitFetcher` with the given gix repository.
-    pub fn new(repo: gix::Repository) -> Self {
+    pub fn new(repo: gix::Repository, timeout: std::time::Duration) -> Self {
         Self {
             repo: std::sync::Mutex::new(repo),
+            timeout,
         }
     }
 }
@@ -37,112 +42,42 @@ impl GitFetcher for MainGitFetcher {
         repo_url: &str,
         branch: &str,
     ) -> Result<CommitHash, CommitHashError> {
-        tokio::process::Command::new("git")
-            .args(["ls-remote", "--", repo_url, branch])
-            .output()
-            .await
-            .map_err(CommitHashError::from)
-            .and_then(handle_git_output_result)
-            .and_then(|stdout| extract_hash(stdout, repo_url.to_string(), branch.to_string()))
-    }
-}
-
-/// Analyzes the `git` exit status to handle process output.
-fn handle_git_output_result(output: std::process::Output) -> Result<Vec<u8>, CommitHashError> {
-    if output.status.success() {
-        Ok(output.stdout)
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-        Err(CommitHashError::UnexpectedStatus(stderr))
-    }
-}
-
-/// Extracts the commit hash from a `git ls-remote` process stdout.
-fn extract_hash(
-    stdout: Vec<u8>,
-    repo_url: String,
-    branch: String,
-) -> Result<CommitHash, CommitHashError> {
-    let hash_str = String::from_utf8_lossy(&stdout)
-        .split_whitespace()
-        .next()
-        .map(|s| s.to_string())
-        .ok_or(CommitHashError::UnexpectedOutput {
-            stdout: String::from_utf8_lossy(&stdout).into_owned(),
-            repo_url,
-            branch,
-        })?;
-
-    Ok(CommitHash::new(hash_str)?)
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::panic,
-        clippy::expect_used,
-        clippy::todo,
-        clippy::unimplemented,
-        clippy::indexing_slicing
-    )]
-
-    use super::*;
-
-    #[test]
-    fn test_extract_hash_success() {
-        let stdout = b"678c4343237127dbadbf1806dd98b2154ffd2ebe\trefs/heads/main\n".to_vec();
-        let repo_url = "https://github.com/Nilirad/commit-bridge".to_string();
-        let branch = "main".to_string();
-
-        let result = extract_hash(stdout, repo_url, branch);
-        assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap().as_str(),
-            "678c4343237127dbadbf1806dd98b2154ffd2ebe"
-        );
-    }
-
-    #[test]
-    fn test_extract_hash_empty_output() {
-        let stdout = b"".to_vec();
-        let repo_url = "https://github.com/Nilirad/commit-bridge".to_string();
-        let branch = "main".to_string();
-
-        let result = extract_hash(stdout.clone(), repo_url.clone(), branch.clone());
-
-        let Err(CommitHashError::UnexpectedOutput {
-            stdout: err_stdout,
-            repo_url: err_repo_url,
-            branch: err_branch,
-        }) = result
-        else {
-            panic!("Expected UnexpectedOutput error");
+        let repo_url = repo_url.to_string();
+        let branch = branch.to_string();
+        let timeout = self.timeout;
+        let repo = {
+            let guard = self.repo.lock().unwrap();
+            guard.clone()
         };
 
-        assert_eq!(err_stdout, String::from_utf8(stdout).unwrap_or_default());
-        assert_eq!(err_repo_url, repo_url);
-        assert_eq!(err_branch, branch);
-    }
+        let fetch_task = async move {
+            let mut remote = repo.remote_at(repo_url)?;
+            remote.replace_refspecs(Some(branch.as_str()), Direction::Fetch)?;
+            let connection = remote.connect(Direction::Fetch)?;
+            let (ref_map, _) =
+                connection.ref_map(Discard, gix::remote::ref_map::Options::default())?;
 
-    #[test]
-    fn test_extract_hash_whitespace_only() {
-        let stdout = b"   \n\t ".to_vec();
-        let repo_url = "https://github.com/Nilirad/commit-bridge".to_string();
-        let branch = "main".to_string();
-
-        let result = extract_hash(stdout.clone(), repo_url.clone(), branch.clone());
-
-        let Err(CommitHashError::UnexpectedOutput {
-            stdout: err_stdout,
-            repo_url: err_repo_url,
-            branch: err_branch,
-        }) = result
-        else {
-            panic!("Expected UnexpectedOutput error");
+            let target_suffix = format!("/{}", branch);
+            ref_map
+                .remote_refs
+                .iter()
+                .find(|r| {
+                    let (name, _, _) = r.unpack();
+                    name == branch.as_bytes() || name.ends_with(target_suffix.as_bytes())
+                })
+                .ok_or_else(|| CommitHashError::Git("Branch not found".to_string()))?
+                .unpack()
+                .1
+                .map(|id| id.to_string())
+                .ok_or_else(|| CommitHashError::Git("Hash not found for branch".to_string()))
         };
 
-        assert_eq!(err_stdout, String::from_utf8(stdout).unwrap_or_default());
-        assert_eq!(err_repo_url, repo_url);
-        assert_eq!(err_branch, branch);
+        match tokio::time::timeout(timeout, fetch_task).await {
+            Ok(Ok(hash)) => Ok(CommitHash::new(hash)?),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(CommitHashError::UnexpectedStatus(
+                "Gix operation timed out".to_string(),
+            )),
+        }
     }
 }

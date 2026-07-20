@@ -123,7 +123,8 @@ fn init_context(
     let repo = gix::open(repo_path)
         .map_err(Box::new)
         .or_else(|_| gix::init(repo_path).map_err(Box::new))?;
-    let git_fetcher = crate::polling::git::MainGitFetcher::new(repo);
+    let git_fetcher =
+        crate::polling::git::MainGitFetcher::new(repo, config.server.out_request_timeout);
 
     Ok(SharedContext {
         config,
