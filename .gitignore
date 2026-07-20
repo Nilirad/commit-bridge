@@ -15,3 +15,6 @@
 *.pem
 .env
 /docker-compose.yaml
+
+# Process artifacts
+/git_repo

@@ -95,5 +95,8 @@ pub fn create_test_config() -> crate::config::Config {
             client_id: NonEmptyString::new("test-client-id".to_string()).unwrap(),
             pem_path: PathBuf::from("test-pem-path"),
         },
+        git: crate::config::GitConfig {
+            repo_path: PathBuf::from("test-git-repo"),
+        },
     }
 }

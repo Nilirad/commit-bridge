@@ -79,7 +79,7 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
         pool.clone(),
         config.clone(),
         token.clone(),
-    );
+    )?;
 
     crate::trigger::recover_stuck_tasks(&repository, &config)
         .await
@@ -118,14 +118,23 @@ fn init_context(
     pool: sqlx::SqlitePool,
     config: Config,
     token: CancellationToken,
-) -> SharedContext {
-    SharedContext {
+) -> Result<SharedContext, FatalError> {
+    let repo_path = &config.git.repo_path;
+    let repo = match gix::open(repo_path) {
+        Ok(repo) => repo,
+        Err(gix::open::Error::NotARepository { .. }) => gix::init(repo_path).map_err(Box::new)?,
+        Err(e) => return Err(crate::error::FatalError::GitOpen(Box::new(e))),
+    };
+    let git_fetcher =
+        crate::polling::git::MainGitFetcher::new(repo, config.server.out_request_timeout);
+
+    Ok(SharedContext {
         config,
         repository,
         db_pool: pool,
         token,
-        git_fetcher: std::sync::Arc::new(crate::polling::git::MainGitFetcher),
-    }
+        git_fetcher: std::sync::Arc::new(git_fetcher),
+    })
 }
 
 /// Initializes the background engines.

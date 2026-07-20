@@ -47,3 +47,11 @@ fn test_config_validation_auth_token_validity_too_short_fails() {
 
     assert!(config.validate().is_err());
 }
+
+#[test]
+fn test_config_validation_empty_git_repo_path_fails() {
+    let mut config = create_test_config();
+    config.git.repo_path = std::path::PathBuf::new();
+
+    assert!(config.validate().is_err());
+}

@@ -31,6 +31,10 @@ pub struct Config {
     /// Authentication configuration settings.
     #[validate(nested)]
     pub auth: AuthConfig,
+
+    /// Git-related configuration settings.
+    #[validate(nested)]
+    pub git: GitConfig,
 }
 
 impl Config {
@@ -229,4 +233,20 @@ pub struct AuthConfig {
 
     /// Path to the GitHub App's private key.
     pub pem_path: PathBuf,
+}
+
+/// Validates that a path is not empty.
+fn validate_gix_repo_path(path: &std::path::Path) -> Result<(), validator::ValidationError> {
+    if path.as_os_str().is_empty() {
+        return Err(validator::ValidationError::new("path_cannot_be_empty"));
+    }
+    Ok(())
+}
+
+/// Configuration for Git operations.
+#[derive(Clone, Debug, Deserialize, Validate)]
+pub struct GitConfig {
+    /// Path to initialize or open the gix repository.
+    #[validate(custom(function = "validate_gix_repo_path"))]
+    pub repo_path: PathBuf,
 }
