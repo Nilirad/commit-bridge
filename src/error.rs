@@ -175,4 +175,41 @@ pub enum CommitHashError {
         /// The relevant git branch.
         branch: String,
     },
+
+    /// Failed to find remote.
+    #[error("Failed to find remote: {0}")]
+    // Error is boxed because it is very large
+    RemoteAt(Box<gix::remote::init::Error>),
+
+    /// Failed to connect to remote.
+    #[error("Failed to connect to remote: {0}")]
+    // Error is boxed because it is very large
+    Connect(Box<gix::remote::connect::Error>),
+
+    /// Failed to map refs.
+    #[error("Failed to map refs: {0}")]
+    // Error is boxed because it is very large
+    RefMap(Box<gix::remote::ref_map::Error>),
+
+    /// Git operation failed using gix.
+    #[error("Git operation failed: {0}")]
+    Git(String),
+}
+
+impl From<gix::remote::init::Error> for CommitHashError {
+    fn from(e: gix::remote::init::Error) -> Self {
+        CommitHashError::RemoteAt(Box::new(e))
+    }
+}
+
+impl From<gix::remote::connect::Error> for CommitHashError {
+    fn from(e: gix::remote::connect::Error) -> Self {
+        CommitHashError::Connect(Box::new(e))
+    }
+}
+
+impl From<gix::remote::ref_map::Error> for CommitHashError {
+    fn from(e: gix::remote::ref_map::Error) -> Self {
+        CommitHashError::RefMap(Box::new(e))
+    }
 }
