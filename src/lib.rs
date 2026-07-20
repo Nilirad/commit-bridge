@@ -120,9 +120,11 @@ fn init_context(
     token: CancellationToken,
 ) -> Result<SharedContext, FatalError> {
     let repo_path = &config.git.repo_path;
-    let repo = gix::open(repo_path)
-        .map_err(Box::new)
-        .or_else(|_| gix::init(repo_path).map_err(Box::new))?;
+    let repo = match gix::open(repo_path) {
+        Ok(repo) => repo,
+        Err(gix::open::Error::NotARepository { .. }) => gix::init(repo_path).map_err(Box::new)?,
+        Err(e) => return Err(crate::error::FatalError::GitOpen(Box::new(e))),
+    };
     let git_fetcher =
         crate::polling::git::MainGitFetcher::new(repo, config.server.out_request_timeout);
 

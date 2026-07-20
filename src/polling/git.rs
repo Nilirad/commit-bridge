@@ -26,7 +26,15 @@ pub struct MainGitFetcher {
 
 impl MainGitFetcher {
     /// Creates a new `MainGitFetcher` with the given gix repository.
-    pub fn new(repo: gix::Repository, timeout: std::time::Duration) -> Self {
+    pub fn new(mut repo: gix::Repository, timeout: std::time::Duration) -> Self {
+        let timeout_secs = timeout.as_secs().max(1).to_string();
+
+        let mut config = repo.config_snapshot_mut();
+        let _ = config.set_raw_value("http.lowSpeedLimit", "1");
+        let _ = config.set_raw_value("http.lowSpeedTime", timeout_secs.as_str());
+        let _ = config.set_raw_value("http.connectTimeout", timeout_secs.as_str());
+        let _ = config.commit();
+
         Self {
             repo: repo.into_sync(),
             timeout,
@@ -49,6 +57,7 @@ impl GitFetcher for MainGitFetcher {
         let fetch_task = tokio::task::spawn_blocking(move || {
             let repo = thread_safe_repo.to_thread_local();
             let mut remote = repo.remote_at(repo_url)?;
+            remote = remote.with_fetch_tags(gix::remote::fetch::Tags::None);
             remote.replace_refspecs(Some(branch.as_str()), Direction::Fetch)?;
             let connection = remote.connect(Direction::Fetch)?;
             let (ref_map, _) =
