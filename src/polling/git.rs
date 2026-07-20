@@ -15,7 +15,20 @@ pub trait GitFetcher: Send + Sync {
 }
 
 /// Runs git commands.
-pub struct MainGitFetcher;
+pub struct MainGitFetcher {
+    /// Gix repository handle.
+    #[allow(dead_code)]
+    repo: std::sync::Mutex<gix::Repository>,
+}
+
+impl MainGitFetcher {
+    /// Creates a new `MainGitFetcher` with the given gix repository.
+    pub fn new(repo: gix::Repository) -> Self {
+        Self {
+            repo: std::sync::Mutex::new(repo),
+        }
+    }
+}
 
 #[async_trait]
 impl GitFetcher for MainGitFetcher {

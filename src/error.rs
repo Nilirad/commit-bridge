@@ -100,6 +100,14 @@ pub enum FatalError {
     #[error("Failed to read authentication key file: {0}")]
     AuthKeyIo(#[source] std::io::Error),
 
+    /// Could not open the gix repository.
+    #[error("Failed to open gix repository: {0}")]
+    GitOpen(#[from] Box<gix::open::Error>),
+
+    /// Could not initialize the gix repository.
+    #[error("Failed to initialize gix repository: {0}")]
+    GitInit(#[from] Box<gix::init::Error>),
+
     /// Configuration is invalid.
     #[error(transparent)]
     Setup(SetupError),
