@@ -17,7 +17,7 @@ use axum::{
 };
 use rovo::rovo;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, instrument};
 
 /// Maps a [`SubscriptionWithBranch`] to its HAL representation.
 fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
@@ -56,6 +56,15 @@ fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(
+    skip_all,
+    fields(
+        %payload.source_repo_url,
+        %payload.source_branch_name,
+        %payload.target_repo,
+        %payload.event_type,
+    )
+)]
 pub async fn create_subscription(
     state: State<AppState>,
     payload: Json<CreateSubscription>,
