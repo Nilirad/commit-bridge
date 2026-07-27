@@ -14,9 +14,10 @@
 
 use crate::domain::{BranchName, CommitHash, EventType, RepoUrl, TargetRepo};
 use chrono::{DateTime, Utc};
-use rovo::schemars::JsonSchema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use valuable::Valuable;
 
 /// Represents a row in the `branches` table.
 #[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema)]
@@ -146,7 +147,7 @@ pub struct SubscriptionHal {
 }
 
 /// Holds payload data for the creation of a [`Subscription`].
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Valuable, Debug, Clone, Deserialize, JsonSchema)]
 pub struct CreateSubscription {
     /// Full HTTPS URL of the monitored git repository.
     pub source_repo_url: RepoUrl,
@@ -169,6 +170,7 @@ pub struct CreateSubscription {
     ///
     /// <!-- LINKS -->
     /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
+    #[valuable(skip)]
     pub gh_app_installation_id: i64,
 }
 

@@ -3,9 +3,10 @@
 use crate::error::ValidationError;
 use rovo::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use valuable::Valuable;
 
 /// The target GitHub repository in owner/repo format.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Valuable)]
 #[serde(try_from = "String", into = "String")]
 pub struct TargetRepo(String);
 

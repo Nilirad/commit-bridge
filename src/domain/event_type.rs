@@ -4,9 +4,10 @@ use crate::error::ValidationError;
 use rovo::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
+use valuable::Valuable;
 
 /// The GitHub's `repository_dispatch` `event_type`.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Valuable)]
 #[serde(try_from = "String", into = "String")]
 pub struct EventType(String);
 
