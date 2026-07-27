@@ -84,7 +84,7 @@ async fn create_subscription_inner(
 }
 
 /// Query parameters for listing subscriptions.
-#[derive(Valuable, Debug, Deserialize, rovo::schemars::JsonSchema)]
+#[derive(Valuable, Debug, Deserialize, schemars::JsonSchema)]
 pub struct ListSubscriptionsQuery {
     /// Maximum number of subscriptions to return.
     pub limit: Option<usize>,
@@ -180,7 +180,7 @@ async fn list_subscriptions_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(id = valuable(&id)))]
+#[instrument(skip_all, fields(id = %id))]
 pub async fn get_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -223,7 +223,7 @@ async fn get_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(id = valuable(&id), payload = valuable(&*payload)))]
+#[instrument(skip_all, fields(id = %id, payload = valuable(&*payload)))]
 pub async fn update_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -269,7 +269,7 @@ async fn update_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(id = valuable(&id)))]
+#[instrument(skip_all, fields(id = %id))]
 pub async fn delete_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,

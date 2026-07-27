@@ -1,12 +1,14 @@
 //! Domain type to represent a git commit hash.
 
 use crate::error::ValidationError;
-use rovo::schemars::JsonSchema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use valuable::Valuable;
 
 /// A git commit hash.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Valuable)]
 #[serde(try_from = "String", into = "String")]
+#[valuable(transparent)]
 pub struct CommitHash(String);
 
 impl CommitHash {

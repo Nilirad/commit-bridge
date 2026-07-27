@@ -170,7 +170,6 @@ pub struct CreateSubscription {
     ///
     /// <!-- LINKS -->
     /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
-    #[valuable(skip)]
     pub gh_app_installation_id: i64,
 }
 
@@ -192,7 +191,6 @@ pub struct UpdateSubscription {
     ///
     /// <!-- LINKS -->
     /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
-    #[valuable(skip)]
     pub gh_app_installation_id: Option<i64>,
 }
 

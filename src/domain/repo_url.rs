@@ -1,7 +1,7 @@
 //! Domain type to represent a GitHub repository URL.
 
 use crate::error::ValidationError;
-use rovo::schemars::JsonSchema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use valuable::Valuable;
@@ -9,6 +9,7 @@ use valuable::Valuable;
 /// The GitHub repository URL.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Valuable)]
 #[serde(try_from = "String", into = "String")]
+#[valuable(transparent)]
 pub struct RepoUrl(String);
 
 impl std::fmt::Display for RepoUrl {

@@ -1,13 +1,14 @@
 //! Domain type to represent a target repository hosted on GitHub.
 
 use crate::error::ValidationError;
-use rovo::schemars::JsonSchema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use valuable::Valuable;
 
 /// The target GitHub repository in owner/repo format.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Valuable)]
 #[serde(try_from = "String", into = "String")]
+#[valuable(transparent)]
 pub struct TargetRepo(String);
 
 impl TargetRepo {
