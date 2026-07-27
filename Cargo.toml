@@ -38,10 +38,11 @@ tokio = { version = "1.52.3", features = ["process", "rt-multi-thread", "signal"
 tokio-util = { version = "0.7.18", features = ["rt"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.6", features = ["timeout"] }
-tracing = "0.1.44"
+tracing = { version = "0.1.44", features = ["valuable"] }
 tracing-subscriber = "0.3"
 url = { version = "2.5.8", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
+valuable = { version = "0.1.1", features = ["derive"] }
 
 [dev-dependencies]
 dudect-bencher = "0.7.0"
