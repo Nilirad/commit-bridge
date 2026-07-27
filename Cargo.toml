@@ -39,7 +39,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.6", features = ["timeout"] }
 tracing = { version = "0.1.44", features = ["valuable"] }
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["valuable"] }
 url = { version = "2.5.8", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 valuable = { version = "0.1.1", features = ["derive"] }
