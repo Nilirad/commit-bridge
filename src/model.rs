@@ -175,7 +175,7 @@ pub struct CreateSubscription {
 }
 
 /// Holds payload data for the update of a [`Subscription`].
-#[derive(Debug, Deserialize, JsonSchema)]
+#[derive(Valuable, Debug, Deserialize, JsonSchema)]
 pub struct UpdateSubscription {
     /// The repository whose workflow needs to be triggered.
     pub target_repo: Option<TargetRepo>,
@@ -192,6 +192,7 @@ pub struct UpdateSubscription {
     ///
     /// <!-- LINKS -->
     /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
+    #[valuable(skip)]
     pub gh_app_installation_id: Option<i64>,
 }
 

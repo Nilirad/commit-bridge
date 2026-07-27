@@ -18,6 +18,7 @@ use axum::{
 use rovo::rovo;
 use serde::Deserialize;
 use tracing::{field::valuable, info, instrument};
+use valuable::Valuable;
 
 /// Maps a [`SubscriptionWithBranch`] to its HAL representation.
 fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
@@ -83,7 +84,7 @@ async fn create_subscription_inner(
 }
 
 /// Query parameters for listing subscriptions.
-#[derive(Debug, Deserialize, rovo::schemars::JsonSchema)]
+#[derive(Valuable, Debug, Deserialize, rovo::schemars::JsonSchema)]
 pub struct ListSubscriptionsQuery {
     /// Maximum number of subscriptions to return.
     pub limit: Option<usize>,
@@ -112,6 +113,7 @@ pub struct ListSubscriptionsQuery {
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(query = valuable(&*query)))]
 pub async fn list_subscriptions(
     state: State<AppState>,
     query: Query<ListSubscriptionsQuery>,
@@ -178,6 +180,7 @@ async fn list_subscriptions_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(id = valuable(&id)))]
 pub async fn get_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -220,6 +223,7 @@ async fn get_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(id = valuable(&id), payload = valuable(&*payload)))]
 pub async fn update_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -265,6 +269,7 @@ async fn update_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(id = valuable(&id)))]
 pub async fn delete_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
