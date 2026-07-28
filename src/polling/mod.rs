@@ -50,6 +50,7 @@ async fn polling_loop(ctx: SharedContext) {
 ///
 /// <!-- LINKS -->
 /// [`TriggerEngine`]: crate::trigger::TriggerEngine
+#[tracing::instrument(skip_all)]
 async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
     let updated_branches = gather_updated_branches(ctx).await?;
     if updated_branches.is_empty() {
@@ -68,6 +69,7 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
 }
 
 /// Gathers stored branches that need to be updated.
+#[tracing::instrument(skip_all)]
 async fn gather_updated_branches(ctx: &SharedContext) -> Result<Vec<BranchInfo>, sqlx::Error> {
     let branches = BranchRepository::get_all(ctx.repository.as_ref())
         .await
@@ -105,6 +107,7 @@ fn execute_branch_updates<'a>(
 }
 
 /// Processes branch updates within a transaction.
+#[tracing::instrument(skip_all)]
 async fn process_branches(
     repo: std::sync::Arc<crate::repository::SqliteRepository>,
     shared_branches: std::sync::Arc<Vec<branch::BranchInfo>>,
