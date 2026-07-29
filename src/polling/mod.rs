@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use futures::{StreamExt, future::BoxFuture, stream};
-use tracing::{info, warn};
+use tracing::{field::valuable, info, warn};
 
 use crate::{
     context::SharedContext,
@@ -115,17 +115,33 @@ async fn process_branches(
 ) -> Result<(), RepositoryError> {
     let branches = std::sync::Arc::clone(&shared_branches);
     for branch_info in branches.iter() {
-        repo.update_last_commit_hash_in_tx(branch_info.branch.id, &branch_info.latest_hash, tx)
-            .await?;
-
-        info!(
-            "New commit detected for branch {}. Hash: {}",
-            branch_info.branch.name, branch_info.latest_hash
-        );
-
-        repo.queue_triggers_for_branch(branch_info.branch.id, &branch_info.latest_hash, tx)
-            .await?;
+        process_single_branch(repo.clone(), branch_info, tx).await?;
     }
+    Ok(())
+}
+
+/// Processes a single branch update within a transaction.
+#[tracing::instrument(
+    skip_all,
+    fields(
+        branch_info = valuable(branch_info),
+    )
+)]
+async fn process_single_branch(
+    repo: std::sync::Arc<crate::repository::SqliteRepository>,
+    branch_info: &branch::BranchInfo,
+    tx: &mut sqlx::SqliteConnection,
+) -> Result<(), RepositoryError> {
+    repo.update_last_commit_hash_in_tx(branch_info.branch.id, &branch_info.latest_hash, tx)
+        .await?;
+
+    info!(
+        "New commit detected for branch {}. Hash: {}",
+        branch_info.branch.name, branch_info.latest_hash
+    );
+
+    repo.queue_triggers_for_branch(branch_info.branch.id, &branch_info.latest_hash, tx)
+        .await?;
     Ok(())
 }
 

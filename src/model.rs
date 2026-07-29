@@ -20,7 +20,7 @@ use sqlx::FromRow;
 use valuable::Valuable;
 
 /// Represents a row in the `branches` table.
-#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema, Valuable)]
 pub struct Branch {
     /// Unique database primary key.
     pub id: i64,
@@ -37,9 +37,11 @@ pub struct Branch {
     pub last_commit_hash: Option<CommitHash>,
 
     /// Timestamp when the record was created.
+    #[valuable(skip)]
     pub created_at: DateTime<Utc>,
 
     /// Timestamp when the record was updated.
+    #[valuable(skip)]
     pub updated_at: DateTime<Utc>,
 }
 
