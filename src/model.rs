@@ -195,7 +195,7 @@ pub struct UpdateSubscription {
 }
 
 /// Represents a row in the `trigger_queue` table.
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Valuable)]
 pub struct TriggerQueueItem {
     /// Unique database primary key.
     pub id: i64,

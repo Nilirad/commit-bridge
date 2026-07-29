@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use reqwest::Client;
-use tracing::{info, warn};
+use tracing::{field::valuable, info, warn};
 
 use crate::{
     context::SharedContext,
@@ -55,6 +55,12 @@ async fn trigger_loop(engine: &TriggerEngine) {
 }
 
 /// Processes a single queued event.
+#[tracing::instrument(
+    skip_all,
+    fields(
+        trigger = tracing::field::Empty
+    )
+)]
 async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
     let Some(trigger) = engine
         .ctx
@@ -64,6 +70,8 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
     else {
         return Ok(());
     };
+
+    tracing::Span::current().record("trigger", valuable(&trigger));
 
     let dispatch_result = dispatch_events(engine, &trigger).await;
     match dispatch_result {
@@ -87,6 +95,7 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
 }
 
 /// Schedules the next retry for a trigger in the `trigger_queue`.
+#[tracing::instrument(skip_all)]
 async fn schedule_retry(
     engine: &TriggerEngine,
     trigger: TriggerQueueItem,
@@ -124,6 +133,7 @@ async fn schedule_retry(
 }
 
 /// Recovers tasks that have been stuck in `PROCESSING` for too long.
+#[tracing::instrument(skip_all)]
 pub async fn recover_stuck_tasks(
     repo: &crate::repository::SqliteRepository,
     config: &crate::config::Config,
@@ -138,6 +148,7 @@ pub async fn recover_stuck_tasks(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
+#[tracing::instrument(skip_all)]
 pub async fn dispatch_events(
     engine: &TriggerEngine,
     trigger: &TriggerQueueItem,
@@ -173,6 +184,7 @@ pub async fn dispatch_events(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
+#[tracing::instrument(skip_all)]
 async fn notify_subscription(
     engine: &TriggerEngine,
     iat: String,
@@ -187,6 +199,7 @@ async fn notify_subscription(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
+#[tracing::instrument(skip_all)]
 async fn send_repository_dispatch(
     engine: &TriggerEngine,
     iat: &str,
