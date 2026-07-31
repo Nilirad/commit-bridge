@@ -445,7 +445,7 @@ impl TriggerRepository for SqliteRepository {
                  WHERE status IN ('PENDING') AND next_retry_at <= CURRENT_TIMESTAMP
                  ORDER BY next_retry_at ASC LIMIT 1
              )
-             RETURNING id, branch_id, new_hash, retry_count, target_repo, event_type, gh_app_installation_id",
+             RETURNING id, branch_id, new_hash, retry_count, target_repo, event_type, gh_app_installation_id, span_context",
         )
         .fetch_optional(&self.pool)
         .await
@@ -499,19 +499,22 @@ impl TriggerRepository for SqliteRepository {
 
     async fn queue_triggers_for_branch(
         &self,
-        branch_id: i64,
-        new_hash: &crate::domain::CommitHash,
+        params: crate::repository::trigger::QueueTriggersParams<'_>,
         executor: &mut sqlx::SqliteConnection,
     ) -> Result<(), RepositoryError> {
+        let branch_id = params.branch_id;
+        let new_hash = params.new_hash;
+        let span_context = params.span_context;
         sqlx::query!(
-            "INSERT INTO trigger_queue (branch_id, new_hash, target_repo, event_type, gh_app_installation_id)
-             SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id
+            "INSERT INTO trigger_queue (branch_id, new_hash, target_repo, event_type, gh_app_installation_id, span_context)
+             SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id, ?
              FROM subscriptions s
              WHERE s.branch_id = ?
              ON CONFLICT(target_repo, event_type) WHERE status = 'PENDING'
-             DO UPDATE SET branch_id = excluded.branch_id, new_hash = excluded.new_hash, status_updated_at = CURRENT_TIMESTAMP",
+             DO UPDATE SET branch_id = excluded.branch_id, new_hash = excluded.new_hash, span_context = excluded.span_context, status_updated_at = CURRENT_TIMESTAMP",
             branch_id,
             new_hash,
+            span_context,
             branch_id
         )
         .execute(executor)

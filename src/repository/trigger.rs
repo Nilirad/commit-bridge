@@ -20,6 +20,19 @@ pub struct UpdateRetryStatus {
     pub backoff_base_secs: u64,
 }
 
+/// Parameters for queueing triggers for a branch.
+#[derive(Debug, Clone)]
+pub struct QueueTriggersParams<'a> {
+    /// The unique identifier of the branch.
+    pub branch_id: i64,
+
+    /// The new commit hash.
+    pub new_hash: &'a crate::domain::CommitHash,
+
+    /// Optional serialized OpenTelemetry span context.
+    pub span_context: Option<&'a str>,
+}
+
 /// Interface for `trigger_queue` table operations.
 #[async_trait]
 pub trait TriggerRepository: Send + Sync {
@@ -43,8 +56,7 @@ pub trait TriggerRepository: Send + Sync {
     /// Queues trigger events for all subscriptions of a branch.
     async fn queue_triggers_for_branch(
         &self,
-        branch_id: i64,
-        new_hash: &crate::domain::CommitHash,
+        params: QueueTriggersParams<'_>,
         executor: &mut sqlx::SqliteConnection,
     ) -> Result<(), RepositoryError>;
 }

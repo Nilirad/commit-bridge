@@ -225,4 +225,7 @@ pub struct TriggerQueueItem {
 
     /// Number of times the task has been attempted.
     pub retry_count: i64,
+
+    /// Serialized OpenTelemetry span context.
+    pub span_context: Option<String>,
 }

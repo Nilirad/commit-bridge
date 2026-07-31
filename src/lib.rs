@@ -58,6 +58,7 @@ pub mod model;
 pub mod polling;
 pub mod repository;
 pub mod state;
+pub mod telemetry;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]

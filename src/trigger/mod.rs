@@ -71,6 +71,11 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
         return Ok(());
     };
 
+    crate::telemetry::add_link_from_serialized_context(
+        &tracing::Span::current(),
+        trigger.span_context.as_deref(),
+    );
+
     tracing::Span::current().record("trigger", valuable(&trigger));
 
     let dispatch_result = dispatch_events(engine, &trigger).await;
@@ -439,6 +444,7 @@ mod tests {
             target_repo: TargetRepo::new("org/repo".to_string()).unwrap(),
             event_type: EventType::new("event".to_string()).unwrap(),
             gh_app_installation_id: 1,
+            span_context: None,
         };
 
         let engine = TriggerEngine {

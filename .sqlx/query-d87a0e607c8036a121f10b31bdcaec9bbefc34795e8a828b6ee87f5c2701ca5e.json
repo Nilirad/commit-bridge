@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO trigger_queue (branch_id, new_hash, target_repo, event_type, gh_app_installation_id, span_context)\n             SELECT ?, ?, s.target_repo, s.event_type, s.gh_app_installation_id, ?\n             FROM subscriptions s\n             WHERE s.branch_id = ?\n             ON CONFLICT(target_repo, event_type) WHERE status = 'PENDING'\n             DO UPDATE SET branch_id = excluded.branch_id, new_hash = excluded.new_hash, span_context = excluded.span_context, status_updated_at = CURRENT_TIMESTAMP",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "d87a0e607c8036a121f10b31bdcaec9bbefc34795e8a828b6ee87f5c2701ca5e"
+}
