@@ -1,7 +1,81 @@
 //! OpenTelemetry telemetry helpers.
 
 use opentelemetry::global;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+
+/// Initializes the OpenTelemetry tracer provider if not disabled and configuration is valid.
+fn init_tracer_provider() -> Option<SdkTracerProvider> {
+    if std::env::var_os("OTEL_SDK_DISABLED").is_some() {
+        eprintln!("OpenTelemetry disabled via OTEL_SDK_DISABLED.");
+        return None;
+    }
+
+    let exporter = match opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .build()
+    {
+        Ok(exporter) => exporter,
+        Err(e) => {
+            eprintln!("Failed to build OTLP span exporter, telemetry disabled: {e}");
+            return None;
+        }
+    };
+
+    Some(
+        SdkTracerProvider::builder()
+            .with_batch_exporter(exporter)
+            .with_resource(
+                opentelemetry_sdk::Resource::builder()
+                    .with_service_name("commit-bridge")
+                    .build(),
+            )
+            .build(),
+    )
+}
+
+/// Guard that gracefully shuts down the tracer provider on drop.
+///
+/// Must be held alive while spans are still being emitted;
+/// dropping it flushes and shuts down the underlying provider.
+#[must_use]
+pub struct TelemetryGuard(Option<SdkTracerProvider>);
+
+impl Drop for TelemetryGuard {
+    fn drop(&mut self) {
+        if let Some(provider) = self.0.take()
+            && let Err(e) = provider.shutdown()
+        {
+            tracing::error!("Failed to gracefully shut down tracer provider: {e}");
+        }
+    }
+}
+
+/// Sets up the global OpenTelemetry propagator and tracing subscriber.
+pub fn init() -> TelemetryGuard {
+    global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
+
+    let tracer_provider = init_tracer_provider();
+
+    let otel_layer = tracer_provider.as_ref().map(|provider| {
+        let tracer = opentelemetry::trace::TracerProvider::tracer(provider, "commit-bridge");
+        tracing_opentelemetry::layer().with_tracer(tracer)
+    });
+
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(tracing_subscriber::fmt::layer())
+        .with(otel_layer)
+        .init();
+
+    #[cfg(debug_assertions)]
+    tracing::warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
+
+    TelemetryGuard(tracer_provider)
+}
 
 /// Serializes the current tracing span's OpenTelemetry context into an optional JSON string,
 /// logging a warning if serialization fails.

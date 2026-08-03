@@ -14,20 +14,16 @@ use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
-
-    #[cfg(debug_assertions)]
-    tracing::warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
-
     let tracker = TaskTracker::new();
     let token = CancellationToken::new();
 
-    run_app(&tracker, &token)
-        .await
-        .unwrap_or_else(|e| error!("{e}"));
-
-    token.cancel();
-    tracker.close();
-    tracker.wait().await;
-    info!("All systems terminated. Terminating process.")
+    match run_app(&tracker, &token).await {
+        Ok(_tracer_guard) => {
+            token.cancel();
+            tracker.close();
+            tracker.wait().await;
+            info!("All systems terminated. Terminating process.");
+        }
+        Err(e) => error!("{e}"),
+    }
 }

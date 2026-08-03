@@ -27,6 +27,8 @@ http = "1.4.2"
 humantime-serde = "1.1.1"
 jsonwebtoken = { version = "10.4.0", features = ["aws_lc_rs"] }
 opentelemetry = "0.32.0"
+opentelemetry-otlp = { version = "0.32.0", features = ["trace", "grpc-tonic"] }
+opentelemetry_sdk = "0.32.1"
 reqwest = { version = "0.13.4", features = ["json"] }
 rovo = { version = "0.4.8", features = ["scalar"] }
 schemars = { version = "0.9", features = ["chrono04"] }
@@ -41,7 +43,7 @@ tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.6", features = ["timeout"] }
 tracing = { version = "0.1.44", features = ["valuable"] }
 tracing-opentelemetry = "0.33.0"
-tracing-subscriber = { version = "0.3", features = ["valuable"] }
+tracing-subscriber = { version = "0.3", features = ["valuable", "env-filter"] }
 url = { version = "2.5.8", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 valuable = { version = "0.1.1", features = ["derive"] }

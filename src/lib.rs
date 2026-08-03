@@ -69,7 +69,15 @@ pub mod trigger;
 type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 
 /// Runs the server, delegating errors to the caller.
-pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result<(), FatalError> {
+///
+/// Initializes telemetry on entry and returns a [`telemetry::TelemetryGuard`]
+/// that must be held until all spawned tasks have terminated,
+/// so that spans are flushed before the tracer provider is shut down.
+pub async fn run_app(
+    tracker: &TaskTracker,
+    token: &CancellationToken,
+) -> Result<telemetry::TelemetryGuard, FatalError> {
+    let tracer_guard = crate::telemetry::init();
     let config = Config::load()?;
     let pool = init_database(&config).await?;
     let repository = std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone()));
@@ -93,7 +101,9 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
 
     let app = build_router(repository, pool, &config);
 
-    run_server(app, &ctx.config, token.clone()).await
+    run_server(app, &ctx.config, token.clone()).await?;
+
+    Ok(tracer_guard)
 }
 
 /// Initializes the database pool.
