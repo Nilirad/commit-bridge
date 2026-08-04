@@ -7,8 +7,23 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 
 /// Initializes the OpenTelemetry tracer provider if not disabled and configuration is valid.
 fn init_tracer_provider() -> Option<SdkTracerProvider> {
-    if std::env::var_os("OTEL_SDK_DISABLED").is_some() {
+    if std::env::var("OTEL_SDK_DISABLED")
+        .is_ok_and(|value| value.eq_ignore_ascii_case("true") || value == "1")
+    {
         eprintln!("OpenTelemetry disabled via OTEL_SDK_DISABLED.");
+        return None;
+    }
+
+    if std::env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
+        eprintln!("OpenTelemetry disabled via OTEL_TRACES_EXPORTER=none.");
+        return None;
+    }
+
+    if !otlp_endpoint_is_configured() {
+        eprintln!(
+            "OTLP endpoint not configured, telemetry disabled. \
+            Set OTEL_EXPORTER_OTLP_ENDPOINT to enable."
+        );
         return None;
     }
 
@@ -33,6 +48,18 @@ fn init_tracer_provider() -> Option<SdkTracerProvider> {
             )
             .build(),
     )
+}
+
+/// Returns `true` if an OTLP endpoint has been explicitly configured
+/// through the standard OpenTelemetry environment variables.
+fn otlp_endpoint_is_configured() -> bool {
+    is_non_empty_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+        || is_non_empty_var("OTEL_EXPORTER_OTLP_ENDPOINT")
+}
+
+/// Returns `true` if the environment variable is set to a non-empty value.
+fn is_non_empty_var(name: &str) -> bool {
+    std::env::var_os(name).is_some_and(|value| !value.is_empty())
 }
 
 /// Guard that gracefully shuts down the tracer provider on drop.
