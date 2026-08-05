@@ -149,8 +149,7 @@ async fn process_single_branch(
         new_hash: &branch_info.latest_hash,
         span_context: span_context.as_deref(),
     };
-    repo.trigger_queue_queue_for_branch(trigger_params, tx)
-        .await?;
+    repo.trigger_queue_upsert(trigger_params, tx).await?;
     Ok(())
 }
 

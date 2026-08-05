@@ -418,7 +418,7 @@ impl TriggerRepository for SqliteRepository {
     }
 
     #[tracing::instrument(skip_all, fields(branch_id = %params.branch_id))]
-    async fn trigger_queue_queue_for_branch(
+    async fn trigger_queue_upsert(
         &self,
         params: crate::repository::trigger::QueueTriggersParams<'_>,
         executor: &mut sqlx::SqliteConnection,

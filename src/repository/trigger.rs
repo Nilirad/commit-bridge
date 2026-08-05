@@ -57,7 +57,7 @@ pub trait TriggerRepository: Send + Sync {
     async fn trigger_queue_delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
 
     /// Queues trigger events for all subscriptions of a branch.
-    async fn trigger_queue_queue_for_branch(
+    async fn trigger_queue_upsert(
         &self,
         params: QueueTriggersParams<'_>,
         executor: &mut sqlx::SqliteConnection,
