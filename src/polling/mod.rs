@@ -144,7 +144,7 @@ async fn process_single_branch(
 
     let span_context = crate::telemetry::serialize_current_span_context();
 
-    let trigger_params = crate::repository::trigger::QueueTriggersParams {
+    let trigger_params = crate::repository::trigger::TriggerQueueUpsertParams {
         branch_id: branch_info.branch.id,
         new_hash: &branch_info.latest_hash,
         span_context: span_context.as_deref(),

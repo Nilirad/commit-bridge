@@ -84,7 +84,7 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
             engine
                 .ctx
                 .repository
-                .trigger_queue_delete_by_id(trigger.id)
+                .trigger_queue_delete(trigger.id)
                 .await?;
         }
         Err(WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)) => {
@@ -95,7 +95,7 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
             engine
                 .ctx
                 .repository
-                .trigger_queue_delete_by_id(trigger.id)
+                .trigger_queue_delete(trigger.id)
                 .await?;
         }
         Err(e) => {

@@ -20,9 +20,9 @@ pub struct UpdateRetryStatus {
     pub backoff_base_secs: u64,
 }
 
-/// Parameters for queueing triggers for a branch.
+/// Parameters for upserting trigger events for a branch.
 #[derive(Debug, Clone)]
-pub struct QueueTriggersParams<'a> {
+pub struct TriggerQueueUpsertParams<'a> {
     /// The unique identifier of the branch.
     pub branch_id: i64,
 
@@ -54,12 +54,12 @@ pub trait TriggerRepository: Send + Sync {
     ) -> Result<(), RepositoryError>;
 
     /// Deletes the trigger queue item with the given `id`.
-    async fn trigger_queue_delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
+    async fn trigger_queue_delete(&self, id: i64) -> Result<(), RepositoryError>;
 
     /// Queues trigger events for all subscriptions of a branch.
     async fn trigger_queue_upsert(
         &self,
-        params: QueueTriggersParams<'_>,
+        params: TriggerQueueUpsertParams<'_>,
         executor: &mut sqlx::SqliteConnection,
     ) -> Result<(), RepositoryError>;
 }

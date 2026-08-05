@@ -334,7 +334,7 @@ impl SubscriptionRepository for SqliteRepository {
 #[async_trait]
 impl TriggerRepository for SqliteRepository {
     #[tracing::instrument(skip_all, fields(id = %id))]
-    async fn trigger_queue_delete_by_id(&self, id: i64) -> Result<(), RepositoryError> {
+    async fn trigger_queue_delete(&self, id: i64) -> Result<(), RepositoryError> {
         sqlx::query!("DELETE FROM trigger_queue WHERE id = ?", id)
             .execute(&self.pool)
             .await
@@ -420,7 +420,7 @@ impl TriggerRepository for SqliteRepository {
     #[tracing::instrument(skip_all, fields(branch_id = %params.branch_id))]
     async fn trigger_queue_upsert(
         &self,
-        params: crate::repository::trigger::QueueTriggersParams<'_>,
+        params: crate::repository::trigger::TriggerQueueUpsertParams<'_>,
         executor: &mut sqlx::SqliteConnection,
     ) -> Result<(), RepositoryError> {
         let branch_id = params.branch_id;
