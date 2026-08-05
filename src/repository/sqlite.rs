@@ -34,6 +34,7 @@ impl SqliteRepository {
     }
 
     /// Runs a closure within a transaction.
+    #[tracing::instrument(skip_all, name = "transaction")]
     pub async fn run_in_transaction<'a, F, T, E>(&self, f: F) -> Result<T, E>
     where
         F: for<'b> FnOnce(&'b mut SqliteConnection) -> BoxFuture<'b, Result<T, E>> + Send + 'a,
@@ -49,6 +50,7 @@ impl SqliteRepository {
 
 #[async_trait]
 impl BranchRepository for SqliteRepository {
+    #[tracing::instrument(skip_all, name = "branches.get_all")]
     async fn get_all(&self) -> Result<Vec<Branch>, RepositoryError> {
         sqlx::query_as::<_, Branch>("SELECT * FROM branches")
             .fetch_all(&self.pool)
@@ -56,6 +58,7 @@ impl BranchRepository for SqliteRepository {
             .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(skip_all, name = "branches.find_by_id", fields(id = %id))]
     async fn find_by_id(&self, id: i64) -> Result<Option<Branch>, RepositoryError> {
         sqlx::query_as::<_, Branch>("SELECT * FROM branches WHERE id = ?")
             .bind(id)
@@ -64,6 +67,7 @@ impl BranchRepository for SqliteRepository {
             .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(skip_all, name = "branches.delete_by_id", fields(id = %id))]
     async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError> {
         let result = sqlx::query!("DELETE FROM branches WHERE id = ?", id)
             .execute(&self.pool)
@@ -76,6 +80,7 @@ impl BranchRepository for SqliteRepository {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, name = "branches.update_last_commit_hash", fields(id = %id))]
     async fn update_last_commit_hash(
         &self,
         id: i64,
@@ -92,6 +97,11 @@ impl BranchRepository for SqliteRepository {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "branches.update_last_commit_hash_in_tx",
+        fields(id = %id)
+    )]
     async fn update_last_commit_hash_in_tx(
         &self,
         id: i64,
@@ -112,6 +122,7 @@ impl BranchRepository for SqliteRepository {
 
 #[async_trait]
 impl SubscriptionRepository for SqliteRepository {
+    #[tracing::instrument(skip_all, name = "subscriptions.create")]
     async fn create(
         &self,
         subscription_payload: &CreateSubscription,
@@ -154,6 +165,7 @@ impl SubscriptionRepository for SqliteRepository {
         })
     }
 
+    #[tracing::instrument(skip_all, name = "subscriptions.get_by_id", fields(id = %id))]
     async fn get_by_id(&self, id: i64) -> Result<Option<Subscription>, RepositoryError> {
         sqlx::query_as::<_, Subscription>("SELECT * FROM subscriptions WHERE id = ?")
             .bind(id)
@@ -162,6 +174,7 @@ impl SubscriptionRepository for SqliteRepository {
             .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(skip_all, name = "subscriptions.get_by_id_with_branch", fields(id = %id))]
     async fn get_by_id_with_branch(
         &self,
         id: i64,
@@ -201,6 +214,11 @@ impl SubscriptionRepository for SqliteRepository {
         }
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "subscriptions.get_by_keys_with_branch",
+        fields(branch_id = %branch_id, target_repo = %target_repo, event_type = %event_type)
+    )]
     async fn get_by_keys_with_branch(
         &self,
         branch_id: i64,
@@ -244,6 +262,11 @@ impl SubscriptionRepository for SqliteRepository {
         }
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "subscriptions.list_paginated",
+        fields(last_id = %last_id, limit = %limit)
+    )]
     async fn list_paginated(
         &self,
         last_id: i64,
@@ -259,6 +282,11 @@ impl SubscriptionRepository for SqliteRepository {
         .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "subscriptions.list_paginated_with_branches",
+        fields(last_id = %last_id, limit = %limit)
+    )]
     async fn list_paginated_with_branches(
         &self,
         last_id: i64,
@@ -303,6 +331,7 @@ impl SubscriptionRepository for SqliteRepository {
         subscriptions
     }
 
+    #[tracing::instrument(skip_all, name = "subscriptions.count_remaining", fields(last_id = %last_id))]
     async fn count_remaining(&self, last_id: i64) -> Result<i64, RepositoryError> {
         sqlx::query_scalar!("SELECT COUNT(*) FROM subscriptions WHERE id > ?", last_id)
             .fetch_one(&self.pool)
@@ -310,6 +339,7 @@ impl SubscriptionRepository for SqliteRepository {
             .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(skip_all, name = "subscriptions.update", fields(id = %id))]
     async fn update(
         &self,
         id: i64,
@@ -348,6 +378,7 @@ impl SubscriptionRepository for SqliteRepository {
             .ok_or(RepositoryError::NotFound)
     }
 
+    #[tracing::instrument(skip_all, name = "subscriptions.delete", fields(id = %id))]
     async fn delete(&self, id: i64) -> Result<(), RepositoryError> {
         let result = sqlx::query!("DELETE FROM subscriptions WHERE id = ?", id)
             .execute(&self.pool)
@@ -360,6 +391,11 @@ impl SubscriptionRepository for SqliteRepository {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "subscriptions.get_branch_id_by_subscription_id",
+        fields(id = %id)
+    )]
     async fn get_branch_id_by_subscription_id(
         &self,
         id: i64,
@@ -370,6 +406,11 @@ impl SubscriptionRepository for SqliteRepository {
             .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "subscriptions.count_subscriptions_by_branch_id",
+        fields(branch_id = %branch_id)
+    )]
     async fn count_subscriptions_by_branch_id(
         &self,
         branch_id: i64,
@@ -383,6 +424,7 @@ impl SubscriptionRepository for SqliteRepository {
         .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(skip_all, name = "subscriptions.delete_and_cascade", fields(id = %id))]
     async fn delete_subscription_and_cascade(&self, id: i64) -> Result<(), RepositoryError> {
         self.run_in_transaction(|tx| {
             Box::pin(async move {
@@ -419,6 +461,7 @@ impl SubscriptionRepository for SqliteRepository {
 
 #[async_trait]
 impl TriggerRepository for SqliteRepository {
+    #[tracing::instrument(skip_all, name = "trigger_queue.get_all")]
     async fn get_all(&self) -> Result<Vec<TriggerQueueItem>, RepositoryError> {
         sqlx::query_as::<_, TriggerQueueItem>("SELECT * FROM trigger_queue")
             .fetch_all(&self.pool)
@@ -426,6 +469,7 @@ impl TriggerRepository for SqliteRepository {
             .map_err(RepositoryError::Database)
     }
 
+    #[tracing::instrument(skip_all, name = "trigger_queue.delete_by_id", fields(id = %id))]
     async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError> {
         sqlx::query!("DELETE FROM trigger_queue WHERE id = ?", id)
             .execute(&self.pool)
@@ -434,6 +478,7 @@ impl TriggerRepository for SqliteRepository {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, name = "trigger_queue.mark_processing")]
     async fn find_oldest_pending_and_mark_processing(
         &self,
     ) -> Result<Option<TriggerQueueItem>, RepositoryError> {
@@ -454,6 +499,11 @@ impl TriggerRepository for SqliteRepository {
         Ok(trigger)
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "trigger_queue.update_retry_status",
+        fields(id = %params.id, retry_count = %params.retry_count)
+    )]
     async fn update_retry_status(&self, params: UpdateRetryStatus) -> Result<(), RepositoryError> {
         let next_retry_count = params.retry_count + 1;
 
@@ -481,6 +531,11 @@ impl TriggerRepository for SqliteRepository {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "trigger_queue.recover_stuck_tasks",
+        fields(threshold_seconds = %threshold_seconds)
+    )]
     async fn recover_stuck_tasks(&self, threshold_seconds: u64) -> Result<(), RepositoryError> {
         let threshold_str = format!("-{} seconds", threshold_seconds);
 
@@ -497,6 +552,11 @@ impl TriggerRepository for SqliteRepository {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip_all,
+        name = "trigger_queue.queue_for_branch",
+        fields(branch_id = %params.branch_id)
+    )]
     async fn queue_triggers_for_branch(
         &self,
         params: crate::repository::trigger::QueueTriggersParams<'_>,
