@@ -71,7 +71,9 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
 /// Gathers stored branches that need to be updated.
 #[tracing::instrument(skip_all)]
 async fn gather_updated_branches(ctx: &SharedContext) -> Result<Vec<BranchInfo>, sqlx::Error> {
-    let branches = BranchRepository::get_all(ctx.repository.as_ref())
+    let branches = ctx
+        .repository
+        .branches_get_all()
         .await
         .map_err(|e| match e {
             crate::repository::RepositoryError::Database(e) => e,
@@ -132,8 +134,12 @@ async fn process_single_branch(
     branch_info: &branch::BranchInfo,
     tx: &mut sqlx::SqliteConnection,
 ) -> Result<(), RepositoryError> {
-    repo.update_last_commit_hash_in_tx(branch_info.branch.id, &branch_info.latest_hash, tx)
-        .await?;
+    repo.branches_update_last_commit_hash_in_tx(
+        branch_info.branch.id,
+        &branch_info.latest_hash,
+        tx,
+    )
+    .await?;
 
     info!(
         "New commit detected for branch {}. Hash: {}",
@@ -147,7 +153,8 @@ async fn process_single_branch(
         new_hash: &branch_info.latest_hash,
         span_context: span_context.as_deref(),
     };
-    repo.queue_triggers_for_branch(trigger_params, tx).await?;
+    repo.trigger_queue_queue_for_branch(trigger_params, tx)
+        .await?;
     Ok(())
 }
 

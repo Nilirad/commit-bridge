@@ -37,24 +37,30 @@ pub struct QueueTriggersParams<'a> {
 #[async_trait]
 pub trait TriggerRepository: Send + Sync {
     /// Returns all the trigger queue items.
-    async fn get_all(&self) -> Result<Vec<TriggerQueueItem>, RepositoryError>;
+    async fn trigger_queue_get_all(&self) -> Result<Vec<TriggerQueueItem>, RepositoryError>;
 
     /// Finds the oldest pending trigger queue item and marks it as processing in a transaction.
-    async fn find_oldest_pending_and_mark_processing(
+    async fn trigger_queue_process_oldest_pending(
         &self,
     ) -> Result<Option<TriggerQueueItem>, RepositoryError>;
 
     /// Schedules a retry or marks the trigger as failed if max attempts is reached.
-    async fn update_retry_status(&self, params: UpdateRetryStatus) -> Result<(), RepositoryError>;
+    async fn trigger_queue_update_retry_status(
+        &self,
+        params: UpdateRetryStatus,
+    ) -> Result<(), RepositoryError>;
 
     /// Recovers tasks that have been stuck in `PROCESSING` for too long.
-    async fn recover_stuck_tasks(&self, threshold_seconds: u64) -> Result<(), RepositoryError>;
+    async fn trigger_queue_recover_stuck_tasks(
+        &self,
+        threshold_seconds: u64,
+    ) -> Result<(), RepositoryError>;
 
     /// Deletes the trigger queue item with the given `id`.
-    async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
+    async fn trigger_queue_delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
 
     /// Queues trigger events for all subscriptions of a branch.
-    async fn queue_triggers_for_branch(
+    async fn trigger_queue_queue_for_branch(
         &self,
         params: QueueTriggersParams<'_>,
         executor: &mut sqlx::SqliteConnection,

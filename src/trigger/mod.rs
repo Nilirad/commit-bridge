@@ -65,7 +65,7 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
     let Some(trigger) = engine
         .ctx
         .repository
-        .find_oldest_pending_and_mark_processing()
+        .trigger_queue_process_oldest_pending()
         .await?
     else {
         return Ok(());
@@ -81,14 +81,22 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
     let dispatch_result = dispatch_events(engine, &trigger).await;
     match dispatch_result {
         Ok(_) => {
-            TriggerRepository::delete_by_id(&*engine.ctx.repository, trigger.id).await?;
+            engine
+                .ctx
+                .repository
+                .trigger_queue_delete_by_id(trigger.id)
+                .await?;
         }
         Err(WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)) => {
             warn!(
                 "Subscription for branch ID {} and target repo {} was not found (likely deleted). Deleting trigger task {} from queue.",
                 trigger.branch_id, trigger.target_repo, trigger.id
             );
-            TriggerRepository::delete_by_id(&*engine.ctx.repository, trigger.id).await?;
+            engine
+                .ctx
+                .repository
+                .trigger_queue_delete_by_id(trigger.id)
+                .await?;
         }
         Err(e) => {
             warn!("Dispatch failed: {e}");
@@ -126,7 +134,7 @@ async fn schedule_retry(
     engine
         .ctx
         .repository
-        .update_retry_status(UpdateRetryStatus {
+        .trigger_queue_update_retry_status(UpdateRetryStatus {
             id: trigger.id,
             retry_count: trigger.retry_count,
             max_attempts,
@@ -145,7 +153,8 @@ pub async fn recover_stuck_tasks(
 ) -> Result<(), crate::repository::RepositoryError> {
     let threshold_seconds = config.engine.stuck_task_threshold.as_secs();
 
-    repo.recover_stuck_tasks(threshold_seconds).await?;
+    repo.trigger_queue_recover_stuck_tasks(threshold_seconds)
+        .await?;
     Ok(())
 }
 
@@ -161,7 +170,11 @@ pub async fn dispatch_events(
     let sub_with_branch = engine
         .ctx
         .repository
-        .get_by_keys_with_branch(trigger.branch_id, &trigger.target_repo, &trigger.event_type)
+        .subscriptions_get_by_keys_with_branch(
+            trigger.branch_id,
+            &trigger.target_repo,
+            &trigger.event_type,
+        )
         .await?
         .ok_or_else(|| {
             WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)
@@ -404,7 +417,7 @@ mod tests {
 
         let repo = crate::repository::SqliteRepository::new(pool.clone());
         let trigger = repo
-            .find_oldest_pending_and_mark_processing()
+            .trigger_queue_process_oldest_pending()
             .await
             .unwrap()
             .unwrap();

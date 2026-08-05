@@ -70,7 +70,7 @@ async fn create_subscription_inner(
     State(state): State<AppState>,
     Json(payload): Json<CreateSubscription>,
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
-    let sub_with_branch = state.repository.create(&payload).await?;
+    let sub_with_branch = state.repository.subscriptions_create(&payload).await?;
 
     info!(
         "Registered new subscription for branch ID {} (repo: {}, branch: {}): {:?}",
@@ -134,13 +134,16 @@ async fn list_subscriptions_inner(
 
     let subscriptions = state
         .repository
-        .list_paginated_with_branches(last_id, limit as i64)
+        .subscriptions_list_paginated(last_id, limit as i64)
         .await?;
 
     let data: Vec<SubscriptionHal> = subscriptions.into_iter().map(map_to_hal).collect();
 
     let next_id = data.last().map(|s| s.subscription.id).unwrap_or(last_id);
-    let remaining_count = state.repository.count_remaining(next_id).await?;
+    let remaining_count = state
+        .repository
+        .subscriptions_count_remaining(next_id)
+        .await?;
 
     let next_link = data
         .last()
@@ -195,7 +198,7 @@ async fn get_subscription_inner(
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
     let sub_with_branch = state
         .repository
-        .get_by_id_with_branch(id)
+        .subscriptions_get_by_id_with_branch(id)
         .await?
         .ok_or(HandlerError::NotFound)?;
     Ok(Json(map_to_hal(sub_with_branch)))
@@ -238,10 +241,10 @@ async fn update_subscription_inner(
     Path(id): Path<i64>,
     Json(payload): Json<UpdateSubscription>,
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
-    state.repository.update(id, &payload).await?;
+    state.repository.subscriptions_update(id, &payload).await?;
     let sub_with_branch = state
         .repository
-        .get_by_id_with_branch(id)
+        .subscriptions_get_by_id_with_branch(id)
         .await?
         .ok_or(HandlerError::NotFound)?;
 
@@ -282,7 +285,10 @@ async fn delete_subscription_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<(), HandlerError> {
-    state.repository.delete_subscription_and_cascade(id).await?;
+    state
+        .repository
+        .subscriptions_delete_and_cascade(id)
+        .await?;
     Ok(())
 }
 
