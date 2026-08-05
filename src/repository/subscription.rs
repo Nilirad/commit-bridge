@@ -14,12 +14,6 @@ pub trait SubscriptionRepository: Send + Sync {
         subscription: &CreateSubscription,
     ) -> Result<SubscriptionWithBranch, RepositoryError>;
 
-    /// Returns the subscription with the given id.
-    async fn subscriptions_get_by_id(
-        &self,
-        id: i64,
-    ) -> Result<Option<Subscription>, RepositoryError>;
-
     /// Returns the subscription with the given id with its branch information.
     async fn subscriptions_get_by_id_with_branch(
         &self,
@@ -54,21 +48,6 @@ pub trait SubscriptionRepository: Send + Sync {
         subscription: &UpdateSubscription,
     ) -> Result<Subscription, RepositoryError>;
 
-    /// Deletes the subscription with the given id.
-    async fn subscriptions_delete(&self, id: i64) -> Result<(), RepositoryError>;
-
-    /// Returns the branch ID associated to the given subscription's `id`.
-    async fn subscriptions_get_branch_id_by_subscription_id(
-        &self,
-        id: i64,
-    ) -> Result<Option<i64>, RepositoryError>;
-
-    /// Counts the number of subscriptions associated to the given `branch_id`.
-    async fn subscriptions_count_subscriptions_by_branch_id(
-        &self,
-        branch_id: i64,
-    ) -> Result<i64, RepositoryError>;
-
     /// Deletes a subscription and cascades deletion to the associated branch if no other subscriptions exist.
-    async fn subscriptions_delete_and_cascade(&self, id: i64) -> Result<(), RepositoryError>;
+    async fn subscriptions_delete(&self, id: i64) -> Result<(), RepositoryError>;
 }

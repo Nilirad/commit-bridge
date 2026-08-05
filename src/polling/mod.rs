@@ -134,12 +134,8 @@ async fn process_single_branch(
     branch_info: &branch::BranchInfo,
     tx: &mut sqlx::SqliteConnection,
 ) -> Result<(), RepositoryError> {
-    repo.branches_update_last_commit_hash_in_tx(
-        branch_info.branch.id,
-        &branch_info.latest_hash,
-        tx,
-    )
-    .await?;
+    repo.branches_update_last_commit_hash(branch_info.branch.id, &branch_info.latest_hash, tx)
+        .await?;
 
     info!(
         "New commit detected for branch {}. Hash: {}",

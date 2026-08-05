@@ -36,9 +36,6 @@ pub struct QueueTriggersParams<'a> {
 /// Interface for `trigger_queue` table operations.
 #[async_trait]
 pub trait TriggerRepository: Send + Sync {
-    /// Returns all the trigger queue items.
-    async fn trigger_queue_get_all(&self) -> Result<Vec<TriggerQueueItem>, RepositoryError>;
-
     /// Finds the oldest pending trigger queue item and marks it as processing in a transaction.
     async fn trigger_queue_process_oldest_pending(
         &self,

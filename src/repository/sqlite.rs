@@ -28,11 +28,6 @@ impl SqliteRepository {
         Self { pool }
     }
 
-    /// Returns the stored [`SqlitePool`].
-    pub fn get_pool(&self) -> &SqlitePool {
-        &self.pool
-    }
-
     /// Runs a closure within a transaction.
     #[tracing::instrument(skip_all)]
     pub async fn run_in_transaction<'a, F, T, E>(&self, f: F) -> Result<T, E>
@@ -59,46 +54,7 @@ impl BranchRepository for SqliteRepository {
     }
 
     #[tracing::instrument(skip_all, fields(id = %id))]
-    async fn branches_find_by_id(&self, id: i64) -> Result<Option<Branch>, RepositoryError> {
-        sqlx::query_as::<_, Branch>("SELECT * FROM branches WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(RepositoryError::Database)
-    }
-
-    #[tracing::instrument(skip_all, fields(id = %id))]
-    async fn branches_delete_by_id(&self, id: i64) -> Result<(), RepositoryError> {
-        let result = sqlx::query!("DELETE FROM branches WHERE id = ?", id)
-            .execute(&self.pool)
-            .await
-            .map_err(RepositoryError::Database)?;
-
-        if result.rows_affected() == 0 {
-            return Err(RepositoryError::NotFound);
-        }
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, fields(id = %id))]
     async fn branches_update_last_commit_hash(
-        &self,
-        id: i64,
-        hash: &crate::domain::CommitHash,
-    ) -> Result<(), RepositoryError> {
-        sqlx::query!(
-            "UPDATE branches SET last_commit_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            hash,
-            id
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(RepositoryError::Database)?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, fields(id = %id))]
-    async fn branches_update_last_commit_hash_in_tx(
         &self,
         id: i64,
         hash: &crate::domain::CommitHash,
@@ -159,18 +115,6 @@ impl SubscriptionRepository for SqliteRepository {
                 name: subscription_payload.source_branch_name.clone(),
             },
         })
-    }
-
-    #[tracing::instrument(skip_all, fields(id = %id))]
-    async fn subscriptions_get_by_id(
-        &self,
-        id: i64,
-    ) -> Result<Option<Subscription>, RepositoryError> {
-        sqlx::query_as::<_, Subscription>("SELECT * FROM subscriptions WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(RepositoryError::Database)
     }
 
     #[tracing::instrument(skip_all, fields(id = %id))]
@@ -354,44 +298,6 @@ impl SubscriptionRepository for SqliteRepository {
 
     #[tracing::instrument(skip_all, fields(id = %id))]
     async fn subscriptions_delete(&self, id: i64) -> Result<(), RepositoryError> {
-        let result = sqlx::query!("DELETE FROM subscriptions WHERE id = ?", id)
-            .execute(&self.pool)
-            .await
-            .map_err(RepositoryError::Database)?;
-
-        if result.rows_affected() == 0 {
-            return Err(RepositoryError::NotFound);
-        }
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, fields(id = %id))]
-    async fn subscriptions_get_branch_id_by_subscription_id(
-        &self,
-        id: i64,
-    ) -> Result<Option<i64>, RepositoryError> {
-        sqlx::query_scalar!("SELECT branch_id FROM subscriptions WHERE id = ?", id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(RepositoryError::Database)
-    }
-
-    #[tracing::instrument(skip_all, fields(branch_id = %branch_id))]
-    async fn subscriptions_count_subscriptions_by_branch_id(
-        &self,
-        branch_id: i64,
-    ) -> Result<i64, RepositoryError> {
-        sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM subscriptions WHERE branch_id = ?",
-            branch_id
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(RepositoryError::Database)
-    }
-
-    #[tracing::instrument(skip_all, fields(id = %id))]
-    async fn subscriptions_delete_and_cascade(&self, id: i64) -> Result<(), RepositoryError> {
         self.run_in_transaction(|tx| {
             Box::pin(async move {
                 let branch_id = sqlx::query_scalar!(
@@ -427,14 +333,6 @@ impl SubscriptionRepository for SqliteRepository {
 
 #[async_trait]
 impl TriggerRepository for SqliteRepository {
-    #[tracing::instrument(skip_all)]
-    async fn trigger_queue_get_all(&self) -> Result<Vec<TriggerQueueItem>, RepositoryError> {
-        sqlx::query_as::<_, TriggerQueueItem>("SELECT * FROM trigger_queue")
-            .fetch_all(&self.pool)
-            .await
-            .map_err(RepositoryError::Database)
-    }
-
     #[tracing::instrument(skip_all, fields(id = %id))]
     async fn trigger_queue_delete_by_id(&self, id: i64) -> Result<(), RepositoryError> {
         sqlx::query!("DELETE FROM trigger_queue WHERE id = ?", id)

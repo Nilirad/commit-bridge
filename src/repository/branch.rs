@@ -10,21 +10,8 @@ pub trait BranchRepository: Send + Sync {
     /// Returns all branches.
     async fn branches_get_all(&self) -> Result<Vec<Branch>, RepositoryError>;
 
-    /// Returns the branch with the given `id`.
-    async fn branches_find_by_id(&self, id: i64) -> Result<Option<Branch>, RepositoryError>;
-
-    /// Deletes the branch with the given `id`.
-    async fn branches_delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
-
     /// Updates the last commit hash of the branch.
     async fn branches_update_last_commit_hash(
-        &self,
-        id: i64,
-        hash: &crate::domain::CommitHash,
-    ) -> Result<(), RepositoryError>;
-
-    /// Updates the last commit hash of the branch within a transaction.
-    async fn branches_update_last_commit_hash_in_tx(
         &self,
         id: i64,
         hash: &crate::domain::CommitHash,

@@ -285,10 +285,7 @@ async fn delete_subscription_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<(), HandlerError> {
-    state
-        .repository
-        .subscriptions_delete_and_cascade(id)
-        .await?;
+    state.repository.subscriptions_delete(id).await?;
     Ok(())
 }
 
