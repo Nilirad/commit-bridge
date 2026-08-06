@@ -229,5 +229,6 @@ pub struct TriggerQueueItem {
     pub retry_count: i64,
 
     /// Serialized OpenTelemetry span context.
+    #[valuable(skip)]
     pub span_context: Option<String>,
 }

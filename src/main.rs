@@ -8,7 +8,8 @@
     clippy::indexing_slicing
 )]
 
-use commit_bridge::run_app;
+use commit_bridge::{log_dotenv_status, run_app, telemetry};
+use dotenvy::dotenv;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
@@ -17,13 +18,20 @@ async fn main() {
     let tracker = TaskTracker::new();
     let token = CancellationToken::new();
 
-    match run_app(&tracker, &token).await {
-        Ok(_tracer_guard) => {
-            token.cancel();
-            tracker.close();
-            tracker.wait().await;
-            info!("All systems terminated. Terminating process.");
-        }
+    let dotenv_loaded = dotenv().is_ok();
+    let tracer_guard = telemetry::init();
+    log_dotenv_status(dotenv_loaded);
+
+    let result = run_app(&tracker, &token).await;
+
+    token.cancel();
+    tracker.close();
+    tracker.wait().await;
+
+    match result {
+        Ok(()) => info!("All systems terminated. Terminating process."),
         Err(e) => error!("{e}"),
     }
+
+    drop(tracer_guard);
 }

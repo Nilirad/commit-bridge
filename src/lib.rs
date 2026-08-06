@@ -69,19 +69,7 @@ pub mod trigger;
 type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 
 /// Runs the server, delegating errors to the caller.
-///
-/// Initializes telemetry on entry and returns a [`telemetry::TelemetryGuard`]
-/// that must be held until all spawned tasks have terminated,
-/// so that spans are flushed before the tracer provider is shut down.
-pub async fn run_app(
-    tracker: &TaskTracker,
-    token: &CancellationToken,
-) -> Result<telemetry::TelemetryGuard, FatalError> {
-    // Load `.env` before telemetry initialization, so that OTEL environment
-    // variables are visible when the tracer provider checks for them.
-    let dotenv_loaded = dotenvy::dotenv().is_ok();
-    let tracer_guard = crate::telemetry::init();
-    log_dotenv_status(dotenv_loaded);
+pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result<(), FatalError> {
     let config = Config::load()?;
     let pool = init_database(&config).await?;
     let repository = std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone()));
@@ -107,13 +95,13 @@ pub async fn run_app(
 
     run_server(app, &ctx.config, token.clone()).await?;
 
-    Ok(tracer_guard)
+    Ok(())
 }
 
 /// Logs the outcome of the `.env` file load.
 ///
 /// Must only be called after the tracing subscriber is initialized.
-fn log_dotenv_status(loaded: bool) {
+pub fn log_dotenv_status(loaded: bool) {
     if !loaded {
         return;
     }
