@@ -196,6 +196,14 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
 }
 
 /// Middleware to authorize requests with an API key.
+#[tracing::instrument(
+    skip_all,
+    fields(
+        uri = %req.uri(),
+        method = %req.method(),
+        authenticated = tracing::field::Empty
+    )
+)]
 async fn auth_middleware(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -208,8 +216,11 @@ async fn auth_middleware(
         let auth_header = req.headers().get("X-API-KEY").and_then(|v| v.to_str().ok());
 
         if !verify_api_key(state.config.auth.api_key.as_ref(), auth_header) {
+            tracing::Span::current().record("authenticated", false);
             return StatusCode::UNAUTHORIZED.into_response();
         }
+
+        tracing::Span::current().record("authenticated", true);
     }
 
     next.run(req).await
@@ -252,6 +263,7 @@ async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
 mod health_handler {
     use super::*;
     #[rovo]
+    #[tracing::instrument(skip_all)]
     pub async fn health_check(State(_state): State<AppState>) -> &'static str {
         "CommitBridge is alive"
     }
