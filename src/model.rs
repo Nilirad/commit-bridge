@@ -46,7 +46,7 @@ pub struct Branch {
 }
 
 /// Represents a row in the `subscriptions` table.
-#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema, Clone)]
+#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema, Clone, Valuable)]
 pub struct Subscription {
     /// Unique database primary key.
     pub id: i64,
@@ -72,9 +72,11 @@ pub struct Subscription {
     pub gh_app_installation_id: i64,
 
     /// Timestamp when the record was created.
+    #[valuable(skip)]
     pub created_at: DateTime<Utc>,
 
     /// Timestamp when the record was updated.
+    #[valuable(skip)]
     pub updated_at: DateTime<Utc>,
 }
 

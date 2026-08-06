@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{field::valuable, info};
 
 use crate::{
     config::Config,
@@ -33,6 +33,7 @@ pub struct GitHubAuthenticator {
 
 #[async_trait]
 impl Authenticator for GitHubAuthenticator {
+    #[tracing::instrument(skip_all, fields(subscription = valuable(subscription)))]
     async fn request_installation_token(
         &self,
         subscription: &Subscription,
