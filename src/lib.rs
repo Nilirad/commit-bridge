@@ -30,7 +30,8 @@ use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_http::timeout::TimeoutLayer;
-use tracing::info;
+use tower_http::trace::{MakeSpan, TraceLayer};
+use tracing::{Span, info};
 
 use crate::{
     config::Config,
@@ -257,6 +258,27 @@ mod health_handler {
     }
 }
 
+/// Span factory for incoming HTTP requests,
+/// following OpenTelemetry semantic conventions.
+///
+/// The span is created within this crate
+/// so that it is picked up by the telemetry filter
+/// (which only exports spans whose target starts with `commit_bridge`),
+/// unlike the default `tower_http` span factory.
+#[derive(Clone, Copy)]
+struct HttpRequestSpan;
+
+impl<B> MakeSpan<B> for HttpRequestSpan {
+    fn make_span(&mut self, request: &Request<B>) -> Span {
+        tracing::info_span!(
+            "http.request",
+            otel.kind = "server",
+            http.request.method = %request.method(),
+            url.path = %request.uri().path(),
+        )
+    }
+}
+
 /// Builds the application router.
 pub fn build_router(
     repository: std::sync::Arc<crate::repository::SqliteRepository>,
@@ -299,6 +321,7 @@ pub fn build_router(
             StatusCode::REQUEST_TIMEOUT,
             config.server.in_request_timeout,
         ))
+        .layer(TraceLayer::new_for_http().make_span_with(HttpRequestSpan))
 }
 
 /// Runs the server.
