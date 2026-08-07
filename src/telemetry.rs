@@ -1,6 +1,6 @@
 //! OpenTelemetry telemetry helpers.
 
-use opentelemetry::global;
+use opentelemetry::{global, trace::TracerProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
@@ -81,16 +81,19 @@ impl Drop for TelemetryGuard {
 
 /// Sets up the global OpenTelemetry propagator and tracing subscriber.
 pub fn init() -> TelemetryGuard {
+    const TRACER_NAME: &'static str = "commit-bridge";
+    const DEFAULT_RUST_LOG: &'static str = "commit_bridge=info";
+
     global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
 
     let tracer_provider = init_tracer_provider();
 
     let otel_layer = tracer_provider.as_ref().map(|provider| {
-        let tracer = opentelemetry::trace::TracerProvider::tracer(provider, "commit-bridge");
+        let tracer = provider.tracer(TRACER_NAME);
         tracing_opentelemetry::layer().with_tracer(tracer)
     });
 
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new(DEFAULT_RUST_LOG));
 
     tracing_subscriber::registry()
         .with(env_filter)
