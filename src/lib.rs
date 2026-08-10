@@ -288,12 +288,32 @@ impl<B> MakeSpan<B> for HttpRequestSpan {
 /// Must be used with [`HttpRequestSpan`],
 /// which declares the fields recorded here.
 #[derive(Clone, Copy)]
-struct HttpRequestOnResponse;
+pub(crate) struct HttpRequestOnResponse {
+    /// Whether client error responses (4xx)
+    /// should be marked as errors in exported traces.
+    mark_client_errors: bool,
+}
+
+impl HttpRequestOnResponse {
+    /// Creates a new [`HttpRequestOnResponse`].
+    pub(crate) const fn new(mark_client_errors: bool) -> Self {
+        Self { mark_client_errors }
+    }
+
+    /// Returns `true` if the response status should be marked as an error
+    /// in exported traces.
+    ///
+    /// Server errors (5xx) are always marked;
+    /// client errors (4xx) are only marked when `mark_client_errors` is set.
+    pub(crate) fn should_mark_error(&self, status: StatusCode) -> bool {
+        status.is_server_error() || (self.mark_client_errors && status.is_client_error())
+    }
+}
 
 impl<B> OnResponse<B> for HttpRequestOnResponse {
     fn on_response(self, response: &Response<B>, _latency: Duration, span: &Span) {
         span.record("http.response.status_code", response.status().as_u16());
-        if response.status().is_client_error() || response.status().is_server_error() {
+        if self.should_mark_error(response.status()) {
             span.record("otel.status_code", "ERROR");
         }
     }
@@ -344,7 +364,9 @@ pub fn build_router(
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(HttpRequestSpan)
-                .on_response(HttpRequestOnResponse),
+                .on_response(HttpRequestOnResponse::new(
+                    config.telemetry.mark_client_errors_as_error,
+                )),
         )
 }
 
