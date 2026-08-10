@@ -81,8 +81,8 @@ impl Drop for TelemetryGuard {
 
 /// Sets up the global OpenTelemetry propagator and tracing subscriber.
 pub fn init() -> TelemetryGuard {
-    const TRACER_NAME: &'static str = "commit-bridge";
-    const DEFAULT_RUST_LOG: &'static str = "commit_bridge=info";
+    const TRACER_NAME: &str = "commit-bridge";
+    const DEFAULT_RUST_LOG: &str = "commit_bridge=info";
 
     global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
 

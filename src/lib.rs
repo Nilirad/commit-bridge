@@ -10,6 +10,7 @@
 
 use std::fs;
 use std::str::FromStr;
+use std::time::Duration;
 
 use axum::{
     Router,
@@ -30,7 +31,7 @@ use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_http::timeout::TimeoutLayer;
-use tower_http::trace::{MakeSpan, TraceLayer};
+use tower_http::trace::{MakeSpan, OnResponse, TraceLayer};
 use tracing::{Span, info};
 
 use crate::{
@@ -275,7 +276,26 @@ impl<B> MakeSpan<B> for HttpRequestSpan {
             otel.kind = "server",
             http.request.method = %request.method(),
             url.path = %request.uri().path(),
+            http.response.status_code = tracing::field::Empty,
+            otel.status_code = tracing::field::Empty,
         )
+    }
+}
+
+/// Records HTTP response metadata onto the request span,
+/// following OpenTelemetry semantic conventions.
+///
+/// Must be used with [`HttpRequestSpan`],
+/// which declares the fields recorded here.
+#[derive(Clone, Copy)]
+struct HttpRequestOnResponse;
+
+impl<B> OnResponse<B> for HttpRequestOnResponse {
+    fn on_response(self, response: &Response<B>, _latency: Duration, span: &Span) {
+        span.record("http.response.status_code", response.status().as_u16());
+        if response.status().is_client_error() || response.status().is_server_error() {
+            span.record("otel.status_code", "ERROR");
+        }
     }
 }
 
@@ -321,7 +341,11 @@ pub fn build_router(
             StatusCode::REQUEST_TIMEOUT,
             config.server.in_request_timeout,
         ))
-        .layer(TraceLayer::new_for_http().make_span_with(HttpRequestSpan))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(HttpRequestSpan)
+                .on_response(HttpRequestOnResponse),
+        )
 }
 
 /// Runs the server.
