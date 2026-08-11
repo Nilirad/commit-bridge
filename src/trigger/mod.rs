@@ -58,6 +58,7 @@ async fn trigger_loop(engine: &TriggerEngine) {
 #[tracing::instrument(
     skip_all,
     fields(
+        otel.kind = "consumer",
         trigger = tracing::field::Empty
     )
 )]
@@ -108,7 +109,7 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
 }
 
 /// Schedules the next retry for a trigger in the `trigger_queue`.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, fields(otel.kind = "producer"))]
 async fn schedule_retry(
     engine: &TriggerEngine,
     trigger: TriggerQueueItem,
@@ -146,7 +147,7 @@ async fn schedule_retry(
 }
 
 /// Recovers tasks that have been stuck in `PROCESSING` for too long.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, fields(otel.kind = "producer"))]
 pub async fn recover_stuck_tasks(
     repo: &crate::repository::SqliteRepository,
     config: &crate::config::Config,
@@ -162,7 +163,7 @@ pub async fn recover_stuck_tasks(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 pub async fn dispatch_events(
     engine: &TriggerEngine,
     trigger: &TriggerQueueItem,
@@ -202,7 +203,7 @@ pub async fn dispatch_events(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 async fn notify_subscription(
     engine: &TriggerEngine,
     iat: String,
@@ -217,7 +218,7 @@ async fn notify_subscription(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, fields(otel.kind = "client"))]
 async fn send_repository_dispatch(
     engine: &TriggerEngine,
     iat: &str,

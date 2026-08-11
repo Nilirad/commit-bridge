@@ -44,7 +44,10 @@ impl MainGitFetcher {
 
 #[async_trait]
 impl GitFetcher for MainGitFetcher {
-    #[tracing::instrument(skip_all, fields(repo_url = %repo_url, branch = %branch))]
+    #[tracing::instrument(
+        skip_all,
+        fields(otel.kind = "client", repo_url = %repo_url, branch = %branch)
+    )]
     async fn get_latest_hash(
         &self,
         repo_url: &str,

@@ -33,7 +33,10 @@ pub struct GitHubAuthenticator {
 
 #[async_trait]
 impl Authenticator for GitHubAuthenticator {
-    #[tracing::instrument(skip_all, fields(subscription = valuable(subscription)))]
+    #[tracing::instrument(
+        skip_all,
+        fields(otel.kind = "client", subscription = valuable(subscription))
+    )]
     async fn request_installation_token(
         &self,
         subscription: &Subscription,

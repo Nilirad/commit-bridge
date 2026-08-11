@@ -189,6 +189,7 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
 #[tracing::instrument(
     skip_all,
     fields(
+        otel.kind = "internal",
         uri = %req.uri(),
         method = %req.method(),
         authenticated = tracing::field::Empty
@@ -253,7 +254,7 @@ async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
 mod health_handler {
     use super::*;
     #[rovo]
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
     pub async fn health_check(State(_state): State<AppState>) -> &'static str {
         "CommitBridge is alive"
     }
