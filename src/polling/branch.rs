@@ -1,10 +1,8 @@
 //! Utilities for checking whether a branch has updated.
 
 use crate::{domain::CommitHash, error::CommitHashError, model::Branch, polling::git::GitFetcher};
-use valuable::Valuable;
 
 /// Enables comparison between a git branch row, and the newly fetched branch.
-#[derive(Valuable)]
 pub(super) struct BranchInfo {
     /// The branch currently stored in the database.
     pub branch: Branch,

@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use reqwest::Client;
-use tracing::{field::valuable, info, warn};
+use tracing::{info, warn};
 
 use crate::{
     context::SharedContext,
@@ -59,7 +59,13 @@ async fn trigger_loop(engine: &TriggerEngine) {
     skip_all,
     fields(
         otel.kind = "consumer",
-        trigger = tracing::field::Empty
+        trigger.id = tracing::field::Empty,
+        trigger.branch_id = tracing::field::Empty,
+        trigger.new_hash = tracing::field::Empty,
+        trigger.target_repo = tracing::field::Empty,
+        trigger.event_type = tracing::field::Empty,
+        trigger.gh_app_installation_id = tracing::field::Empty,
+        trigger.retry_count = tracing::field::Empty,
     )
 )]
 async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
@@ -77,7 +83,17 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
         trigger.span_context.as_deref(),
     );
 
-    tracing::Span::current().record("trigger", valuable(&trigger));
+    let span = tracing::Span::current();
+    span.record("trigger.id", trigger.id);
+    span.record("trigger.branch_id", trigger.branch_id);
+    span.record("trigger.new_hash", trigger.new_hash.as_str());
+    span.record("trigger.target_repo", trigger.target_repo.as_str());
+    span.record("trigger.event_type", trigger.event_type.as_str());
+    span.record(
+        "trigger.gh_app_installation_id",
+        trigger.gh_app_installation_id,
+    );
+    span.record("trigger.retry_count", trigger.retry_count);
 
     let dispatch_result = dispatch_events(engine, &trigger).await;
     match dispatch_result {

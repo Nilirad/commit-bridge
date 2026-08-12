@@ -41,12 +41,11 @@ tokio = { version = "1.52.3", features = ["process", "rt-multi-thread", "signal"
 tokio-util = { version = "0.7.18", features = ["rt"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.6", features = ["timeout", "trace"] }
-tracing = { version = "0.1.44", features = ["valuable"] }
+tracing = "0.1.44"
 tracing-opentelemetry = "0.33.0"
-tracing-subscriber = { version = "0.3", features = ["valuable", "env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = { version = "2.5.8", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
-valuable = { version = "0.1.1", features = ["derive"] }
 
 [dev-dependencies]
 dudect-bencher = "0.7.0"

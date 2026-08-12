@@ -17,8 +17,7 @@ use axum::{
 };
 use rovo::rovo;
 use serde::Deserialize;
-use tracing::{field::valuable, info, instrument};
-use valuable::Valuable;
+use tracing::{info, instrument};
 
 /// Maps a [`SubscriptionWithBranch`] to its HAL representation.
 fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
@@ -57,7 +56,14 @@ fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(otel.kind = "internal", payload = valuable(&*payload)))]
+#[instrument(skip_all, fields(
+    otel.kind = "internal",
+    payload.source_repo_url = %payload.source_repo_url.as_str(),
+    payload.source_branch_name = %payload.source_branch_name.as_str(),
+    payload.target_repo = %payload.target_repo.as_str(),
+    payload.event_type = %payload.event_type.as_str(),
+    payload.gh_app_installation_id = %payload.gh_app_installation_id,
+))]
 pub async fn create_subscription(
     state: State<AppState>,
     payload: Json<CreateSubscription>,
@@ -84,7 +90,7 @@ async fn create_subscription_inner(
 }
 
 /// Query parameters for listing subscriptions.
-#[derive(Valuable, Debug, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ListSubscriptionsQuery {
     /// Maximum number of subscriptions to return.
     pub limit: Option<usize>,
@@ -113,7 +119,11 @@ pub struct ListSubscriptionsQuery {
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(otel.kind = "internal", query = valuable(&*query)))]
+#[instrument(skip_all, fields(
+    otel.kind = "internal",
+    query.limit = ?query.limit,
+    query.last_id = ?query.last_id,
+))]
 pub async fn list_subscriptions(
     state: State<AppState>,
     query: Query<ListSubscriptionsQuery>,
@@ -226,7 +236,13 @@ async fn get_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(otel.kind = "internal", id = %id, payload = valuable(&*payload)))]
+#[instrument(skip_all, fields(
+    otel.kind = "internal",
+    id = %id,
+    payload.target_repo = ?payload.target_repo.as_ref().map(|v| v.as_str()),
+    payload.event_type = ?payload.event_type.as_ref().map(|v| v.as_str()),
+    payload.gh_app_installation_id = ?payload.gh_app_installation_id,
+))]
 pub async fn update_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,

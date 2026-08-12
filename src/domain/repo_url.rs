@@ -4,12 +4,10 @@ use crate::error::ValidationError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
-use valuable::Valuable;
 
 /// The GitHub repository URL.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Valuable)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
-#[valuable(transparent)]
 pub struct RepoUrl(String);
 
 impl std::fmt::Display for RepoUrl {

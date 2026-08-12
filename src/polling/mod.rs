@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use futures::{StreamExt, future::BoxFuture, stream};
-use tracing::{field::valuable, info, warn};
+use tracing::{info, warn};
 
 use crate::{
     context::SharedContext,
@@ -127,7 +127,11 @@ async fn process_branches(
     skip_all,
     fields(
         otel.kind = "producer",
-        branch_info = valuable(branch_info),
+        branch.id = %branch_info.branch.id,
+        branch.repo_url = %branch_info.branch.repo_url.as_str(),
+        branch.name = %branch_info.branch.name.as_str(),
+        branch.last_commit_hash = ?branch_info.branch.last_commit_hash.as_deref(),
+        latest_hash = %branch_info.latest_hash.as_str(),
     )
 )]
 async fn process_single_branch(

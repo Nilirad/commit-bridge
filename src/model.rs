@@ -17,10 +17,9 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use valuable::Valuable;
 
 /// Represents a row in the `branches` table.
-#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema, Valuable)]
+#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema)]
 pub struct Branch {
     /// Unique database primary key.
     pub id: i64,
@@ -37,16 +36,14 @@ pub struct Branch {
     pub last_commit_hash: Option<CommitHash>,
 
     /// Timestamp when the record was created.
-    #[valuable(skip)]
     pub created_at: DateTime<Utc>,
 
     /// Timestamp when the record was updated.
-    #[valuable(skip)]
     pub updated_at: DateTime<Utc>,
 }
 
 /// Represents a row in the `subscriptions` table.
-#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema, Clone, Valuable)]
+#[derive(Debug, Serialize, Deserialize, FromRow, JsonSchema, Clone)]
 pub struct Subscription {
     /// Unique database primary key.
     pub id: i64,
@@ -72,11 +69,9 @@ pub struct Subscription {
     pub gh_app_installation_id: i64,
 
     /// Timestamp when the record was created.
-    #[valuable(skip)]
     pub created_at: DateTime<Utc>,
 
     /// Timestamp when the record was updated.
-    #[valuable(skip)]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -151,7 +146,7 @@ pub struct SubscriptionHal {
 }
 
 /// Holds payload data for the creation of a [`Subscription`].
-#[derive(Valuable, Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct CreateSubscription {
     /// Full HTTPS URL of the monitored git repository.
     pub source_repo_url: RepoUrl,
@@ -178,7 +173,7 @@ pub struct CreateSubscription {
 }
 
 /// Holds payload data for the update of a [`Subscription`].
-#[derive(Valuable, Debug, Deserialize, JsonSchema)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateSubscription {
     /// The repository whose workflow needs to be triggered.
     pub target_repo: Option<TargetRepo>,
@@ -199,7 +194,7 @@ pub struct UpdateSubscription {
 }
 
 /// Represents a row in the `trigger_queue` table.
-#[derive(Debug, FromRow, Valuable)]
+#[derive(Debug, FromRow)]
 pub struct TriggerQueueItem {
     /// Unique database primary key.
     pub id: i64,
@@ -229,6 +224,5 @@ pub struct TriggerQueueItem {
     pub retry_count: i64,
 
     /// Serialized OpenTelemetry span context.
-    #[valuable(skip)]
     pub span_context: Option<String>,
 }

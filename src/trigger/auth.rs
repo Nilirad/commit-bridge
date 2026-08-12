@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tracing::{field::valuable, info};
+use tracing::info;
 
 use crate::{
     config::Config,
@@ -35,7 +35,14 @@ pub struct GitHubAuthenticator {
 impl Authenticator for GitHubAuthenticator {
     #[tracing::instrument(
         skip_all,
-        fields(otel.kind = "client", subscription = valuable(subscription))
+        fields(
+            otel.kind = "client",
+            subscription.id = %subscription.id,
+            subscription.branch_id = %subscription.branch_id,
+            subscription.target_repo = %subscription.target_repo.as_str(),
+            subscription.event_type = %subscription.event_type.as_str(),
+            subscription.gh_app_installation_id = %subscription.gh_app_installation_id,
+        )
     )]
     async fn request_installation_token(
         &self,

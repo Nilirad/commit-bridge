@@ -3,12 +3,10 @@
 use crate::error::ValidationError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use valuable::Valuable;
 
 /// A git commit hash.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Valuable)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
-#[valuable(transparent)]
 pub struct CommitHash(String);
 
 impl CommitHash {
