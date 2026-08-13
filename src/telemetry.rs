@@ -2,29 +2,46 @@
 
 use opentelemetry::{global, trace::TracerProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
+use thiserror::Error;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
+/// Reason why OpenTelemetry initialization was skipped or failed.
+#[derive(Debug, Error)]
+enum TelemetryDisabledReason {
+    /// The SDK was disabled via `OTEL_SDK_DISABLED`.
+    #[error("OpenTelemetry disabled via OTEL_SDK_DISABLED.")]
+    SdkDisabled,
+
+    /// The exporter was disabled via `OTEL_TRACES_EXPORTER=none`.
+    #[error("OpenTelemetry disabled via OTEL_TRACES_EXPORTER=none.")]
+    ExporterNone,
+
+    /// No OTLP endpoint was configured.
+    #[error(
+        "OTLP endpoint not configured, telemetry disabled. Set OTEL_EXPORTER_OTLP_ENDPOINT to enable."
+    )]
+    EndpointNotConfigured,
+
+    /// The OTLP span exporter failed to build.
+    #[error("Failed to build OTLP span exporter, telemetry disabled: {0}")]
+    ExporterBuildFailed(String),
+}
+
 /// Initializes the OpenTelemetry tracer provider if not disabled and configuration is valid.
-fn init_tracer_provider() -> Option<SdkTracerProvider> {
+fn init_tracer_provider() -> Result<SdkTracerProvider, TelemetryDisabledReason> {
     if std::env::var("OTEL_SDK_DISABLED")
         .is_ok_and(|value| value.eq_ignore_ascii_case("true") || value == "1")
     {
-        eprintln!("OpenTelemetry disabled via OTEL_SDK_DISABLED.");
-        return None;
+        return Err(TelemetryDisabledReason::SdkDisabled);
     }
 
     if std::env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
-        eprintln!("OpenTelemetry disabled via OTEL_TRACES_EXPORTER=none.");
-        return None;
+        return Err(TelemetryDisabledReason::ExporterNone);
     }
 
     if !otlp_endpoint_is_configured() {
-        eprintln!(
-            "OTLP endpoint not configured, telemetry disabled. \
-            Set OTEL_EXPORTER_OTLP_ENDPOINT to enable."
-        );
-        return None;
+        return Err(TelemetryDisabledReason::EndpointNotConfigured);
     }
 
     let exporter = match opentelemetry_otlp::SpanExporter::builder()
@@ -32,22 +49,17 @@ fn init_tracer_provider() -> Option<SdkTracerProvider> {
         .build()
     {
         Ok(exporter) => exporter,
-        Err(e) => {
-            eprintln!("Failed to build OTLP span exporter, telemetry disabled: {e}");
-            return None;
-        }
+        Err(e) => return Err(TelemetryDisabledReason::ExporterBuildFailed(e.to_string())),
     };
 
-    Some(
-        SdkTracerProvider::builder()
-            .with_batch_exporter(exporter)
-            .with_resource(
-                opentelemetry_sdk::Resource::builder()
-                    .with_service_name("commit-bridge")
-                    .build(),
-            )
-            .build(),
-    )
+    Ok(SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(
+            opentelemetry_sdk::Resource::builder()
+                .with_service_name("commit-bridge")
+                .build(),
+        )
+        .build())
 }
 
 /// Returns `true` if an OTLP endpoint has been explicitly configured
@@ -88,10 +100,13 @@ pub fn init() -> TelemetryGuard {
 
     let tracer_provider = init_tracer_provider();
 
-    let otel_layer = tracer_provider.as_ref().map(|provider| {
-        let tracer = provider.tracer(TRACER_NAME);
-        tracing_opentelemetry::layer().with_tracer(tracer)
-    });
+    let otel_layer = tracer_provider
+        .as_ref()
+        .map(|provider| {
+            let tracer = provider.tracer(TRACER_NAME);
+            tracing_opentelemetry::layer().with_tracer(tracer)
+        })
+        .ok();
 
     let env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new(DEFAULT_RUST_LOG));
 
@@ -101,10 +116,14 @@ pub fn init() -> TelemetryGuard {
         .with(otel_layer)
         .init();
 
+    if let Err(reason) = &tracer_provider {
+        tracing::warn!("{reason}");
+    }
+
     #[cfg(debug_assertions)]
     tracing::warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
 
-    TelemetryGuard(tracer_provider)
+    TelemetryGuard(tracer_provider.ok())
 }
 
 /// Serializes the current tracing span's OpenTelemetry context into an optional JSON string,
