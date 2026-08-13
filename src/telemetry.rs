@@ -1,8 +1,12 @@
 //! OpenTelemetry telemetry helpers.
 
-use opentelemetry::{global, trace::TracerProvider};
+use opentelemetry::{
+    global,
+    trace::{TraceContextExt, TracerProvider},
+};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use thiserror::Error;
+use tracing::{error, warn};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -24,7 +28,7 @@ impl Drop for TelemetryGuard {
         if let Some(provider) = self.0.take()
             && let Err(e) = provider.shutdown()
         {
-            tracing::error!("Failed to gracefully shut down tracer provider: {e}");
+            error!("Failed to gracefully shut down tracer provider: {e}");
         }
     }
 }
@@ -35,10 +39,12 @@ pub fn init() -> TelemetryGuard {
 
     let tracer_provider = init_tracer_provider();
 
-    let otel_layer = tracer_provider
-        .as_ref()
-        .ok()
-        .map(|provider| tracing_opentelemetry::layer().with_tracer(provider.tracer(TRACER_NAME)));
+    let otel_layer = match &tracer_provider {
+        Ok(provider) => {
+            Some(tracing_opentelemetry::layer().with_tracer(provider.tracer(TRACER_NAME)))
+        }
+        Err(_) => None,
+    };
 
     let env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new(DEFAULT_RUST_LOG));
 
@@ -48,12 +54,12 @@ pub fn init() -> TelemetryGuard {
         .with(otel_layer)
         .init();
 
-    if let Err(reason) = tracer_provider.as_ref() {
-        tracing::warn!("{reason}");
+    if let Err(reason) = &tracer_provider {
+        warn!("{reason}");
     }
 
     #[cfg(debug_assertions)]
-    tracing::warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
+    warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
 
     TelemetryGuard(tracer_provider.ok())
 }
@@ -72,7 +78,7 @@ pub fn serialize_current_span_context() -> Option<String> {
     }
 
     serde_json::to_string(&map)
-        .map_err(|e| tracing::warn!("Failed to serialize span context: {e}"))
+        .map_err(|e| warn!("Failed to serialize span context: {e}"))
         .ok()
 }
 
@@ -83,18 +89,16 @@ pub fn add_link_from_serialized_context(span: &tracing::Span, span_context: Opti
         return;
     };
 
-    match deserialize_span_context(span_ctx_str) {
-        Ok(parent_ctx) => {
-            let remote_span_ctx = opentelemetry::trace::TraceContextExt::span(&parent_ctx)
-                .span_context()
-                .clone();
-            if remote_span_ctx.is_valid() {
-                tracing_opentelemetry::OpenTelemetrySpanExt::add_link(span, remote_span_ctx);
-            }
-        }
-        Err(e) => {
-            tracing::warn!("Failed to deserialize span context: {e}");
-        }
+    let Some(parent_ctx) = deserialize_span_context(span_ctx_str)
+        .map_err(|e| warn!("Failed to deserialize span context: {e}"))
+        .ok()
+    else {
+        return;
+    };
+
+    let remote_span_ctx = parent_ctx.span().span_context().clone();
+    if remote_span_ctx.is_valid() {
+        span.add_link(remote_span_ctx);
     }
 }
 
@@ -122,9 +126,7 @@ enum TelemetryDisabledReason {
 
 /// Initializes the OpenTelemetry tracer provider if not disabled and configuration is valid.
 fn init_tracer_provider() -> Result<SdkTracerProvider, TelemetryDisabledReason> {
-    if std::env::var("OTEL_SDK_DISABLED")
-        .is_ok_and(|value| value.eq_ignore_ascii_case("true") || value == "1")
-    {
+    if env_var_is_truthy("OTEL_SDK_DISABLED") {
         return Err(TelemetryDisabledReason::SdkDisabled);
     }
 
@@ -161,6 +163,11 @@ fn otlp_endpoint_is_configured() -> bool {
 /// Returns `true` if the environment variable is set to a non-empty value.
 fn is_non_empty_var(name: &str) -> bool {
     std::env::var_os(name).is_some_and(|value| !value.is_empty())
+}
+
+/// Returns `true` if the environment variable is set to a truthy value (`true` or `1`).
+fn env_var_is_truthy(name: &str) -> bool {
+    std::env::var(name).is_ok_and(|value| value.eq_ignore_ascii_case("true") || value == "1")
 }
 
 /// Deserializes a JSON string into an OpenTelemetry context.
