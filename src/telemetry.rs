@@ -6,6 +6,12 @@ use thiserror::Error;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
+/// Name used for the OpenTelemetry tracer.
+const TRACER_NAME: &str = "commit-bridge";
+
+/// Fallback log filter used when `RUST_LOG` is not set.
+const DEFAULT_RUST_LOG: &str = "commit_bridge=info";
+
 /// Reason why OpenTelemetry initialization was skipped or failed.
 #[derive(Debug, Error)]
 enum TelemetryDisabledReason {
@@ -44,13 +50,10 @@ fn init_tracer_provider() -> Result<SdkTracerProvider, TelemetryDisabledReason> 
         return Err(TelemetryDisabledReason::EndpointNotConfigured);
     }
 
-    let exporter = match opentelemetry_otlp::SpanExporter::builder()
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_tonic()
         .build()
-    {
-        Ok(exporter) => exporter,
-        Err(e) => return Err(TelemetryDisabledReason::ExporterBuildFailed(e.to_string())),
-    };
+        .map_err(|e| TelemetryDisabledReason::ExporterBuildFailed(e.to_string()))?;
 
     Ok(SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
@@ -93,20 +96,14 @@ impl Drop for TelemetryGuard {
 
 /// Sets up the global OpenTelemetry propagator and tracing subscriber.
 pub fn init() -> TelemetryGuard {
-    const TRACER_NAME: &str = "commit-bridge";
-    const DEFAULT_RUST_LOG: &str = "commit_bridge=info";
-
     global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
 
     let tracer_provider = init_tracer_provider();
 
     let otel_layer = tracer_provider
         .as_ref()
-        .map(|provider| {
-            let tracer = provider.tracer(TRACER_NAME);
-            tracing_opentelemetry::layer().with_tracer(tracer)
-        })
-        .ok();
+        .ok()
+        .map(|provider| tracing_opentelemetry::layer().with_tracer(provider.tracer(TRACER_NAME)));
 
     let env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new(DEFAULT_RUST_LOG));
 
@@ -116,7 +113,7 @@ pub fn init() -> TelemetryGuard {
         .with(otel_layer)
         .init();
 
-    if let Err(reason) = &tracer_provider {
+    if let Err(reason) = tracer_provider.as_ref() {
         tracing::warn!("{reason}");
     }
 
