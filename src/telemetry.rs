@@ -12,71 +12,6 @@ const TRACER_NAME: &str = "commit-bridge";
 /// Fallback log filter used when `RUST_LOG` is not set.
 const DEFAULT_RUST_LOG: &str = "commit_bridge=info";
 
-/// Reason why OpenTelemetry initialization was skipped or failed.
-#[derive(Debug, Error)]
-enum TelemetryDisabledReason {
-    /// The SDK was disabled via `OTEL_SDK_DISABLED`.
-    #[error("OpenTelemetry disabled via OTEL_SDK_DISABLED.")]
-    SdkDisabled,
-
-    /// The exporter was disabled via `OTEL_TRACES_EXPORTER=none`.
-    #[error("OpenTelemetry disabled via OTEL_TRACES_EXPORTER=none.")]
-    ExporterNone,
-
-    /// No OTLP endpoint was configured.
-    #[error(
-        "OTLP endpoint not configured, telemetry disabled. Set OTEL_EXPORTER_OTLP_ENDPOINT to enable."
-    )]
-    EndpointNotConfigured,
-
-    /// The OTLP span exporter failed to build.
-    #[error("Failed to build OTLP span exporter, telemetry disabled: {0}")]
-    ExporterBuildFailed(String),
-}
-
-/// Initializes the OpenTelemetry tracer provider if not disabled and configuration is valid.
-fn init_tracer_provider() -> Result<SdkTracerProvider, TelemetryDisabledReason> {
-    if std::env::var("OTEL_SDK_DISABLED")
-        .is_ok_and(|value| value.eq_ignore_ascii_case("true") || value == "1")
-    {
-        return Err(TelemetryDisabledReason::SdkDisabled);
-    }
-
-    if std::env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
-        return Err(TelemetryDisabledReason::ExporterNone);
-    }
-
-    if !otlp_endpoint_is_configured() {
-        return Err(TelemetryDisabledReason::EndpointNotConfigured);
-    }
-
-    let exporter = opentelemetry_otlp::SpanExporter::builder()
-        .with_tonic()
-        .build()
-        .map_err(|e| TelemetryDisabledReason::ExporterBuildFailed(e.to_string()))?;
-
-    Ok(SdkTracerProvider::builder()
-        .with_batch_exporter(exporter)
-        .with_resource(
-            opentelemetry_sdk::Resource::builder()
-                .with_service_name("commit-bridge")
-                .build(),
-        )
-        .build())
-}
-
-/// Returns `true` if an OTLP endpoint has been explicitly configured
-/// through the standard OpenTelemetry environment variables.
-fn otlp_endpoint_is_configured() -> bool {
-    is_non_empty_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
-        || is_non_empty_var("OTEL_EXPORTER_OTLP_ENDPOINT")
-}
-
-/// Returns `true` if the environment variable is set to a non-empty value.
-fn is_non_empty_var(name: &str) -> bool {
-    std::env::var_os(name).is_some_and(|value| !value.is_empty())
-}
-
 /// Guard that gracefully shuts down the tracer provider on drop.
 ///
 /// Must be held alive while spans are still being emitted;
@@ -161,6 +96,71 @@ pub fn add_link_from_serialized_context(span: &tracing::Span, span_context: Opti
             tracing::warn!("Failed to deserialize span context: {e}");
         }
     }
+}
+
+/// Reason why OpenTelemetry initialization was skipped or failed.
+#[derive(Debug, Error)]
+enum TelemetryDisabledReason {
+    /// The SDK was disabled via `OTEL_SDK_DISABLED`.
+    #[error("OpenTelemetry disabled via OTEL_SDK_DISABLED.")]
+    SdkDisabled,
+
+    /// The exporter was disabled via `OTEL_TRACES_EXPORTER=none`.
+    #[error("OpenTelemetry disabled via OTEL_TRACES_EXPORTER=none.")]
+    ExporterNone,
+
+    /// No OTLP endpoint was configured.
+    #[error(
+        "OTLP endpoint not configured, telemetry disabled. Set OTEL_EXPORTER_OTLP_ENDPOINT to enable."
+    )]
+    EndpointNotConfigured,
+
+    /// The OTLP span exporter failed to build.
+    #[error("Failed to build OTLP span exporter, telemetry disabled: {0}")]
+    ExporterBuildFailed(String),
+}
+
+/// Initializes the OpenTelemetry tracer provider if not disabled and configuration is valid.
+fn init_tracer_provider() -> Result<SdkTracerProvider, TelemetryDisabledReason> {
+    if std::env::var("OTEL_SDK_DISABLED")
+        .is_ok_and(|value| value.eq_ignore_ascii_case("true") || value == "1")
+    {
+        return Err(TelemetryDisabledReason::SdkDisabled);
+    }
+
+    if std::env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
+        return Err(TelemetryDisabledReason::ExporterNone);
+    }
+
+    if !otlp_endpoint_is_configured() {
+        return Err(TelemetryDisabledReason::EndpointNotConfigured);
+    }
+
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .build()
+        .map_err(|e| TelemetryDisabledReason::ExporterBuildFailed(e.to_string()))?;
+
+    Ok(SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(
+            opentelemetry_sdk::Resource::builder()
+                .with_service_name(TRACER_NAME)
+                .build(),
+        )
+        .build())
+}
+
+/// Returns `true` if an OTLP endpoint has been explicitly configured
+/// through the standard OpenTelemetry environment variables.
+fn otlp_endpoint_is_configured() -> bool {
+    is_non_empty_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+        || is_non_empty_var("OTEL_EXPORTER_OTLP_ENDPOINT")
+}
+
+/// Returns `true` if the environment variable is set to a non-empty value.
+fn is_non_empty_var(name: &str) -> bool {
+    std::env::var_os(name).is_some_and(|value| !value.is_empty())
 }
 
 /// Deserializes a JSON string into an OpenTelemetry context.
