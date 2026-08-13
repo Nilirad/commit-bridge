@@ -26,3 +26,7 @@ This file contains crucial context for AI agents working in this repository.
   1. `polling/`: Periodically checks remote git repositories for updates.
   2. `trigger/`: Receives update events from the polling engine via `mpsc` channels and triggers GitHub Action workflows on target repositories.
 - **Error Handling**: Use domain-specific error enums (`HandlerError`, `FatalError`) defined in `src/error.rs` using the `thiserror` crate. Ensure `IntoResponse` is implemented for any errors that bubble up to Axum handlers.
+
+## Reviews
+
+When reviewing the correctness of code, always make sure that a potential issue can actually arise _in the context_ of the affected piece of code.
