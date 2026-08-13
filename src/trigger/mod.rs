@@ -125,7 +125,7 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
 }
 
 /// Schedules the next retry for a trigger in the `trigger_queue`.
-#[tracing::instrument(skip_all, fields(otel.kind = "producer"))]
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 async fn schedule_retry(
     engine: &TriggerEngine,
     trigger: TriggerQueueItem,
@@ -163,7 +163,7 @@ async fn schedule_retry(
 }
 
 /// Recovers tasks that have been stuck in `PROCESSING` for too long.
-#[tracing::instrument(skip_all, fields(otel.kind = "producer"))]
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 pub async fn recover_stuck_tasks(
     repo: &crate::repository::SqliteRepository,
     config: &crate::config::Config,
