@@ -1,6 +1,6 @@
 use crate::telemetry::{
-    add_link_from_serialized_context, build_resource, deserialize_span_context, env_var_is_truthy,
-    otlp_endpoint_is_configured, service_name_is_configured,
+    add_link_from_serialized_context, build_resource, configured_service_name,
+    deserialize_span_context, env_var_is_truthy, otlp_endpoint_is_configured,
 };
 use opentelemetry::{
     Context,
@@ -130,39 +130,39 @@ fn test_add_link_from_serialized_context_noop_on_invalid_json() {
 }
 
 #[test]
-fn test_service_name_is_configured_respects_env() {
+fn test_configured_service_name_respects_env() {
     let _guard = lock_env();
     let _env = EnvBackup::capture(&["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"]);
     remove_env("OTEL_SERVICE_NAME");
     remove_env("OTEL_RESOURCE_ATTRIBUTES");
 
     set_env("OTEL_SERVICE_NAME", "my-service");
-    assert!(service_name_is_configured());
+    assert_eq!(configured_service_name().as_deref(), Some("my-service"));
     remove_env("OTEL_SERVICE_NAME");
 
     set_env(
         "OTEL_RESOURCE_ATTRIBUTES",
         "service.name=from-attrs,deployment.environment=dev",
     );
-    assert!(service_name_is_configured());
+    assert_eq!(configured_service_name().as_deref(), Some("from-attrs"));
     remove_env("OTEL_RESOURCE_ATTRIBUTES");
 
-    assert!(!service_name_is_configured());
+    assert_eq!(configured_service_name(), None);
 }
 
 #[test]
-fn test_service_name_is_configured_ignores_empty_values() {
+fn test_configured_service_name_ignores_empty_values() {
     let _guard = lock_env();
     let _env = EnvBackup::capture(&["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"]);
     remove_env("OTEL_SERVICE_NAME");
     remove_env("OTEL_RESOURCE_ATTRIBUTES");
 
     set_env("OTEL_SERVICE_NAME", "");
-    assert!(!service_name_is_configured());
+    assert_eq!(configured_service_name(), None);
     remove_env("OTEL_SERVICE_NAME");
 
     set_env("OTEL_RESOURCE_ATTRIBUTES", "service.name=");
-    assert!(!service_name_is_configured());
+    assert_eq!(configured_service_name(), None);
     remove_env("OTEL_RESOURCE_ATTRIBUTES");
 }
 

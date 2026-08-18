@@ -159,25 +159,41 @@ fn init_tracer_provider() -> Result<SdkTracerProvider, TelemetryDisabledReason> 
 ///
 /// The SDK-provided resource attributes are kept
 /// (`telemetry.sdk.*` and `OTEL_RESOURCE_ATTRIBUTES`),
-/// and a fallback service name is applied only when
-/// no service name is configured through the environment.
+/// and the `service.name` attribute is set explicitly from the environment
+/// (or the [`TRACER_NAME`] fallback),
+/// so that `OTEL_SERVICE_NAME` takes precedence
+/// over `service.name` in `OTEL_RESOURCE_ATTRIBUTES`,
+/// as required by the OpenTelemetry specification.
 pub(crate) fn build_resource() -> Resource {
-    let mut builder = Resource::builder();
-    if !service_name_is_configured() {
-        builder = builder.with_service_name(TRACER_NAME);
-    }
-    builder.build()
+    Resource::builder()
+        .with_service_name(configured_service_name().unwrap_or(TRACER_NAME.to_string()))
+        .build()
 }
 
-/// Returns `true` if a `service.name` resource attribute
-/// is configured through the standard OpenTelemetry environment variables.
-pub(crate) fn service_name_is_configured() -> bool {
-    std::env::var("OTEL_SERVICE_NAME").is_ok_and(|value| !value.is_empty())
-        || std::env::var("OTEL_RESOURCE_ATTRIBUTES").is_ok_and(|value| {
-            value
-                .split(',')
-                .filter_map(|entry| entry.split_once('='))
-                .any(|(key, value)| key.trim() == "service.name" && !value.trim().is_empty())
+/// Returns the `service.name` resource attribute value
+/// configured through the standard OpenTelemetry environment variables,
+/// if any.
+///
+/// `OTEL_SERVICE_NAME` takes precedence over
+/// the `service.name` entry of `OTEL_RESOURCE_ATTRIBUTES`.
+pub(crate) fn configured_service_name() -> Option<String> {
+    match std::env::var("OTEL_SERVICE_NAME") {
+        Ok(name) if !name.is_empty() => Some(name),
+        _ => resource_attributes_service_name(),
+    }
+}
+
+/// Returns the `service.name` value
+/// from the `OTEL_RESOURCE_ATTRIBUTES` environment variable, if present.
+fn resource_attributes_service_name() -> Option<String> {
+    std::env::var("OTEL_RESOURCE_ATTRIBUTES")
+        .ok()
+        .and_then(|value| {
+            value.split(',').find_map(|entry| {
+                let (key, value) = entry.split_once('=')?;
+                (key.trim() == "service.name" && !value.trim().is_empty())
+                    .then(|| value.trim().to_string())
+            })
         })
 }
 
