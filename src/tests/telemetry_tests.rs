@@ -49,6 +49,35 @@ fn remove_env(name: &str) {
     }
 }
 
+/// Restores environment variables to their original state on drop.
+///
+/// Must only be created from a test that holds [`ENV_LOCK`];
+/// the restoration happens while the lock is still held.
+struct EnvBackup(Vec<(&'static str, Option<String>)>);
+
+impl EnvBackup {
+    /// Captures the current values of the given variables.
+    fn capture(names: &[&'static str]) -> Self {
+        Self(
+            names
+                .iter()
+                .map(|&name| (name, std::env::var(name).ok()))
+                .collect(),
+        )
+    }
+}
+
+impl Drop for EnvBackup {
+    fn drop(&mut self) {
+        for (name, value) in &self.0 {
+            match value {
+                Some(value) => set_env(name, value),
+                None => remove_env(name),
+            }
+        }
+    }
+}
+
 /// Acquires [`ENV_LOCK`], tolerating poisoning.
 fn lock_env() -> MutexGuard<'static, ()> {
     ENV_LOCK
@@ -103,6 +132,10 @@ fn test_add_link_from_serialized_context_noop_on_invalid_json() {
 #[test]
 fn test_service_name_is_configured_respects_env() {
     let _guard = lock_env();
+    let _env = EnvBackup::capture(&["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"]);
+    remove_env("OTEL_SERVICE_NAME");
+    remove_env("OTEL_RESOURCE_ATTRIBUTES");
+
     set_env("OTEL_SERVICE_NAME", "my-service");
     assert!(service_name_is_configured());
     remove_env("OTEL_SERVICE_NAME");
@@ -120,6 +153,10 @@ fn test_service_name_is_configured_respects_env() {
 #[test]
 fn test_service_name_is_configured_ignores_empty_values() {
     let _guard = lock_env();
+    let _env = EnvBackup::capture(&["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"]);
+    remove_env("OTEL_SERVICE_NAME");
+    remove_env("OTEL_RESOURCE_ATTRIBUTES");
+
     set_env("OTEL_SERVICE_NAME", "");
     assert!(!service_name_is_configured());
     remove_env("OTEL_SERVICE_NAME");
@@ -132,6 +169,9 @@ fn test_service_name_is_configured_ignores_empty_values() {
 #[test]
 fn test_build_resource_prefers_env_service_name() {
     let _guard = lock_env();
+    let _env = EnvBackup::capture(&["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"]);
+    remove_env("OTEL_SERVICE_NAME");
+    remove_env("OTEL_RESOURCE_ATTRIBUTES");
     set_env("OTEL_SERVICE_NAME", "my-service");
     let resource = build_resource();
     assert_eq!(
@@ -141,12 +181,42 @@ fn test_build_resource_prefers_env_service_name() {
             .as_deref(),
         Some("my-service")
     );
+}
+
+#[test]
+fn test_build_resource_prefers_env_service_name_over_resource_attributes() {
+    let _guard = lock_env();
+    let _env = EnvBackup::capture(&["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"]);
     remove_env("OTEL_SERVICE_NAME");
+    remove_env("OTEL_RESOURCE_ATTRIBUTES");
+    set_env("OTEL_SERVICE_NAME", "my-service");
+    set_env(
+        "OTEL_RESOURCE_ATTRIBUTES",
+        "service.name=from-attrs,deployment.environment=dev",
+    );
+    let resource = build_resource();
+    assert_eq!(
+        resource
+            .get(&SERVICE_NAME_KEY)
+            .map(|v| v.to_string())
+            .as_deref(),
+        Some("my-service")
+    );
+    assert_eq!(
+        resource
+            .get(&opentelemetry::Key::from_static_str(
+                "deployment.environment"
+            ))
+            .map(|v| v.to_string())
+            .as_deref(),
+        Some("dev")
+    );
 }
 
 #[test]
 fn test_build_resource_falls_back_to_tracer_name() {
     let _guard = lock_env();
+    let _env = EnvBackup::capture(&["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"]);
     remove_env("OTEL_SERVICE_NAME");
     remove_env("OTEL_RESOURCE_ATTRIBUTES");
     let resource = build_resource();
@@ -162,6 +232,8 @@ fn test_build_resource_falls_back_to_tracer_name() {
 #[test]
 fn test_env_var_truthiness() {
     let _guard = lock_env();
+    let _env = EnvBackup::capture(&["CBRIDGE_TEST_TRUTHY"]);
+    remove_env("CBRIDGE_TEST_TRUTHY");
     set_env("CBRIDGE_TEST_TRUTHY", "1");
     assert!(env_var_is_truthy("CBRIDGE_TEST_TRUTHY"));
     set_env("CBRIDGE_TEST_TRUTHY", "true");
@@ -177,6 +249,12 @@ fn test_env_var_truthiness() {
 #[test]
 fn test_otlp_endpoint_detection() {
     let _guard = lock_env();
+    let _env = EnvBackup::capture(&[
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    ]);
+    remove_env("OTEL_EXPORTER_OTLP_ENDPOINT");
+    remove_env("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT");
     set_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317");
     assert!(otlp_endpoint_is_configured());
     remove_env("OTEL_EXPORTER_OTLP_ENDPOINT");
