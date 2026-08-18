@@ -183,7 +183,7 @@ pub(crate) fn service_name_is_configured() -> bool {
 
 /// Returns `true` if an OTLP endpoint has been explicitly configured
 /// through the standard OpenTelemetry environment variables.
-fn otlp_endpoint_is_configured() -> bool {
+pub(crate) fn otlp_endpoint_is_configured() -> bool {
     is_non_empty_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
         || is_non_empty_var("OTEL_EXPORTER_OTLP_ENDPOINT")
 }
@@ -194,12 +194,14 @@ fn is_non_empty_var(name: &str) -> bool {
 }
 
 /// Returns `true` if the environment variable is set to a truthy value (`true` or `1`).
-fn env_var_is_truthy(name: &str) -> bool {
+pub(crate) fn env_var_is_truthy(name: &str) -> bool {
     std::env::var(name).is_ok_and(|value| value.eq_ignore_ascii_case("true") || value == "1")
 }
 
 /// Deserializes a JSON string into an OpenTelemetry context.
-fn deserialize_span_context(s: &str) -> Result<opentelemetry::Context, serde_json::Error> {
+pub(crate) fn deserialize_span_context(
+    s: &str,
+) -> Result<opentelemetry::Context, serde_json::Error> {
     let map: std::collections::HashMap<String, String> = serde_json::from_str(s)?;
     let context = global::get_text_map_propagator(|propagator| propagator.extract(&map));
 

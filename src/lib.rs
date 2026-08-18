@@ -5,7 +5,8 @@
     clippy::expect_used,
     clippy::todo,
     clippy::unimplemented,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    clippy::undocumented_unsafe_blocks
 )]
 
 use std::fs;
