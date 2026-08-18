@@ -14,7 +14,13 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 const TRACER_NAME: &str = "commit-bridge";
 
 /// Fallback log filter used when `RUST_LOG` is not set.
-const DEFAULT_RUST_LOG: &str = "commit_bridge=info";
+///
+/// Only targets within this crate are enabled at `info` level by default,
+/// plus slow SQL statements (`sqlx::query` at `warn` level, which
+/// includes the `db.statement` attribute in exported spans).
+/// Set `RUST_LOG=debug` (or narrower targets such as `sqlx::query=debug`)
+/// to enrich spans with per-query details.
+const DEFAULT_RUST_LOG: &str = "commit_bridge=info,sqlx::query=warn";
 
 /// Guard that gracefully shuts down the tracer provider on drop.
 ///
