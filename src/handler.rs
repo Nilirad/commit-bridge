@@ -58,7 +58,6 @@ fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
 #[rovo]
 #[instrument(skip_all, fields(
     otel.kind = "internal",
-    http.route = "/subscriptions",
     payload.source_repo_url = %payload.source_repo_url.as_str(),
     payload.source_branch_name = %payload.source_branch_name.as_str(),
     payload.target_repo = %payload.target_repo.as_str(),
@@ -122,7 +121,6 @@ pub struct ListSubscriptionsQuery {
 #[rovo]
 #[instrument(skip_all, fields(
     otel.kind = "internal",
-    http.route = "/subscriptions",
     query.limit = ?query.limit,
     query.last_id = ?query.last_id,
 ))]
@@ -195,7 +193,7 @@ async fn list_subscriptions_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(otel.kind = "internal", http.route = "/subscriptions/{id}", id = %id))]
+#[instrument(skip_all, fields(otel.kind = "internal", id = %id))]
 pub async fn get_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -240,7 +238,6 @@ async fn get_subscription_inner(
 #[rovo]
 #[instrument(skip_all, fields(
     otel.kind = "internal",
-    http.route = "/subscriptions/{id}",
     id = %id,
     payload.target_repo = ?payload.target_repo.as_ref().map(|v| v.as_str()),
     payload.event_type = ?payload.event_type.as_ref().map(|v| v.as_str()),
@@ -291,7 +288,7 @@ async fn update_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
-#[instrument(skip_all, fields(otel.kind = "internal", http.route = "/subscriptions/{id}", id = %id))]
+#[instrument(skip_all, fields(otel.kind = "internal", id = %id))]
 pub async fn delete_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,

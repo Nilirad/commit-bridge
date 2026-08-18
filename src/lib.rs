@@ -16,7 +16,7 @@ use std::time::Duration;
 use axum::{
     Router,
     body::Body,
-    extract::State,
+    extract::{MatchedPath, State},
     http::{HeaderValue, Request, Response, StatusCode, header},
     middleware::{self, Next},
     response::IntoResponse,
@@ -251,11 +251,22 @@ async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
     response
 }
 
+/// Records the matched route path (`http.route`)
+/// onto the current HTTP request span.
+///
+/// Runs after routing, so the [`MatchedPath`] extension is available.
+async fn record_http_route(req: Request<Body>, next: Next) -> Response<Body> {
+    if let Some(matched) = req.extensions().get::<MatchedPath>() {
+        tracing::Span::current().record("http.route", matched.as_str());
+    }
+    next.run(req).await
+}
+
 #[allow(missing_docs, clippy::missing_docs_in_private_items)]
 mod health_handler {
     use super::*;
     #[rovo]
-    #[tracing::instrument(skip_all, fields(otel.kind = "internal", http.route = "/health"))]
+    #[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
     pub async fn health_check(State(_state): State<AppState>) -> &'static str {
         "CommitBridge is alive"
     }
@@ -279,6 +290,7 @@ impl<B> MakeSpan<B> for HttpRequestSpan {
             otel.kind = "server",
             http.request.method = %request.method(),
             url.path = %request.uri().path(),
+            http.route = tracing::field::Empty,
             http.response.status_code = tracing::field::Empty,
             otel.status_code = tracing::field::Empty,
             error.type = tracing::field::Empty,
@@ -362,6 +374,7 @@ pub fn build_router(
         .finish()
         .layer(middleware::from_fn_with_state(state, auth_middleware))
         .layer(middleware::from_fn(set_no_cache_header))
+        .layer(middleware::from_fn(record_http_route))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             config.server.in_request_timeout,
