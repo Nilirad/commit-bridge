@@ -4,7 +4,7 @@ use opentelemetry::{
     global,
     trace::{TraceContextExt, TracerProvider},
 };
-use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
 use thiserror::Error;
 use tracing::{error, warn};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -151,12 +151,34 @@ fn init_tracer_provider() -> Result<SdkTracerProvider, TelemetryDisabledReason> 
 
     Ok(SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
-        .with_resource(
-            opentelemetry_sdk::Resource::builder()
-                .with_service_name(TRACER_NAME)
-                .build(),
-        )
+        .with_resource(build_resource())
         .build())
+}
+
+/// Builds the tracer provider resource.
+///
+/// The SDK-provided resource attributes are kept
+/// (`telemetry.sdk.*` and `OTEL_RESOURCE_ATTRIBUTES`),
+/// and a fallback service name is applied only when
+/// no service name is configured through the environment.
+pub(crate) fn build_resource() -> Resource {
+    let mut builder = Resource::builder();
+    if !service_name_is_configured() {
+        builder = builder.with_service_name(TRACER_NAME);
+    }
+    builder.build()
+}
+
+/// Returns `true` if a `service.name` resource attribute
+/// is configured through the standard OpenTelemetry environment variables.
+pub(crate) fn service_name_is_configured() -> bool {
+    std::env::var("OTEL_SERVICE_NAME").is_ok_and(|value| !value.is_empty())
+        || std::env::var("OTEL_RESOURCE_ATTRIBUTES").is_ok_and(|value| {
+            value
+                .split(',')
+                .filter_map(|entry| entry.split_once('='))
+                .any(|(key, value)| key.trim() == "service.name" && !value.trim().is_empty())
+        })
 }
 
 /// Returns `true` if an OTLP endpoint has been explicitly configured
