@@ -254,7 +254,7 @@ async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
 mod health_handler {
     use super::*;
     #[rovo]
-    #[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
+    #[tracing::instrument(skip_all, fields(otel.kind = "internal", http.route = "/health"))]
     pub async fn health_check(State(_state): State<AppState>) -> &'static str {
         "CommitBridge is alive"
     }
