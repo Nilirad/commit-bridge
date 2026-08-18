@@ -71,6 +71,15 @@ async fn trigger_loop(engine: &TriggerEngine) {
     )
 )]
 async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
+    let result = process_queue_inner(engine).await;
+    if result.is_err() {
+        tracing::Span::current().record("otel.status_code", "ERROR");
+    }
+    result
+}
+
+/// Internal implementation of [`process_queue`].
+async fn process_queue_inner(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
     let Some(trigger) = engine
         .ctx
         .repository
@@ -99,33 +108,38 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
 
     let dispatch_result = dispatch_events(engine, &trigger).await;
     match dispatch_result {
-        Ok(_) => {
-            engine
-                .ctx
-                .repository
-                .trigger_queue_delete(trigger.id)
-                .await?;
-        }
+        Ok(_) => delete_processed_trigger(engine, trigger.id).await,
         Err(WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)) => {
             warn!(
                 "Subscription for branch ID {} and target repo {} was not found (likely deleted). Deleting trigger task {} from queue.",
                 trigger.branch_id, trigger.target_repo, trigger.id
             );
-            engine
-                .ctx
-                .repository
-                .trigger_queue_delete(trigger.id)
-                .await?;
+            delete_processed_trigger(engine, trigger.id).await
         }
         Err(e) => {
             let span = tracing::Span::current();
             span.record("otel.status_code", "ERROR");
             span.record("error.type", "dispatch_failed");
             warn!("Dispatch failed: {e}");
-            schedule_retry(engine, trigger, e).await?;
+            if let Err(retry_err) = schedule_retry(engine, trigger, e).await {
+                tracing::Span::current().record("error.type", "retry_scheduling_failed");
+                return Err(retry_err);
+            }
+            Ok(())
         }
     }
+}
 
+/// Deletes a processed trigger from the queue,
+/// marking the current span as failed if the deletion errors.
+async fn delete_processed_trigger(
+    engine: &TriggerEngine,
+    trigger_id: i64,
+) -> Result<(), WorkflowTriggerError> {
+    if let Err(e) = engine.ctx.repository.trigger_queue_delete(trigger_id).await {
+        tracing::Span::current().record("error.type", "queue_delete_failed");
+        return Err(e.into());
+    }
     Ok(())
 }
 
