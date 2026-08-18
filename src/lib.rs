@@ -264,9 +264,10 @@ mod health_handler {
 /// following OpenTelemetry semantic conventions.
 ///
 /// The span is created within this crate
-/// so that it is picked up by the telemetry filter
-/// (which only exports spans whose target starts with `commit_bridge`),
-/// unlike the default `tower_http` span factory.
+/// (instead of using the default `tower_http` span factory)
+/// so that it is not filtered out by the default log filter
+/// (`RUST_LOG=commit_bridge=info`),
+/// which only enables targets within this crate.
 #[derive(Clone, Copy)]
 struct HttpRequestSpan;
 
