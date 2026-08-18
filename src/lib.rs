@@ -280,6 +280,7 @@ impl<B> MakeSpan<B> for HttpRequestSpan {
             url.path = %request.uri().path(),
             http.response.status_code = tracing::field::Empty,
             otel.status_code = tracing::field::Empty,
+            error.type = tracing::field::Empty,
         )
     }
 }
@@ -317,6 +318,7 @@ impl<B> OnResponse<B> for HttpRequestOnResponse {
         span.record("http.response.status_code", response.status().as_u16());
         if self.should_mark_error(response.status()) {
             span.record("otel.status_code", "ERROR");
+            span.record("error.type", response.status().as_u16().to_string());
         }
     }
 }

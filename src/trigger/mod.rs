@@ -59,6 +59,8 @@ async fn trigger_loop(engine: &TriggerEngine) {
     skip_all,
     fields(
         otel.kind = "consumer",
+        otel.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
         trigger.id = tracing::field::Empty,
         trigger.branch_id = tracing::field::Empty,
         trigger.new_hash = tracing::field::Empty,
@@ -116,6 +118,9 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
                 .await?;
         }
         Err(e) => {
+            let span = tracing::Span::current();
+            span.record("otel.status_code", "ERROR");
+            span.record("error.type", "dispatch_failed");
             warn!("Dispatch failed: {e}");
             schedule_retry(engine, trigger, e).await?;
         }
@@ -125,7 +130,14 @@ async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerErro
 }
 
 /// Schedules the next retry for a trigger in the `trigger_queue`.
-#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "internal",
+        otel.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+    )
+)]
 async fn schedule_retry(
     engine: &TriggerEngine,
     trigger: TriggerQueueItem,
@@ -141,6 +153,9 @@ async fn schedule_retry(
         .as_secs();
 
     if next_retry_count as u32 >= max_attempts {
+        let span = tracing::Span::current();
+        span.record("otel.status_code", "ERROR");
+        span.record("error.type", "retries_exhausted");
         tracing::warn!(
             "Task {} failed after {} attempts: {e}",
             trigger.id,
@@ -234,7 +249,14 @@ async fn notify_subscription(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
-#[tracing::instrument(skip_all, fields(otel.kind = "client"))]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "client",
+        otel.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+    )
+)]
 async fn send_repository_dispatch(
     engine: &TriggerEngine,
     iat: &str,
@@ -297,6 +319,9 @@ async fn send_repository_dispatch(
         );
         Ok(())
     } else {
+        let span = tracing::Span::current();
+        span.record("otel.status_code", "ERROR");
+        span.record("error.type", response.status().as_u16().to_string());
         Err(WorkflowTriggerError::Api(RequestError::Response {
             status: response.status(),
             text: response.text().await?,
