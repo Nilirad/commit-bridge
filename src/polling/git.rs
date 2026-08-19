@@ -46,57 +46,74 @@ impl MainGitFetcher {
 impl GitFetcher for MainGitFetcher {
     #[tracing::instrument(
         skip_all,
-        fields(otel.kind = "client", repo_url = %repo_url, branch = %branch)
+        fields(
+            otel.kind = "client",
+            otel.status_code = tracing::field::Empty,
+            repo_url = %repo_url,
+            branch = %branch,
+        )
     )]
     async fn get_latest_hash(
         &self,
         repo_url: &str,
         branch: &str,
     ) -> Result<CommitHash, CommitHashError> {
-        let repo_url = repo_url.to_string();
-        let branch = branch.to_string();
-        let timeout = self.timeout;
-        let thread_safe_repo = self.repo.clone();
-
-        let fetch_task = tokio::task::spawn_blocking(move || {
-            let repo = thread_safe_repo.to_thread_local();
-            let mut remote = repo.remote_at(repo_url)?;
-            remote = remote.with_fetch_tags(gix::remote::fetch::Tags::None);
-            remote.replace_refspecs(Some(branch.as_str()), Direction::Fetch)?;
-            let connection = remote.connect(Direction::Fetch)?;
-            let (ref_map, _) =
-                connection.ref_map(Discard, gix::remote::ref_map::Options::default())?;
-
-            let target_head = format!("refs/heads/{}", branch);
-            let target_tag = format!("refs/tags/{}", branch);
-            let target_head_bytes = target_head.as_bytes();
-            let target_tag_bytes = target_tag.as_bytes();
-            let branch_bytes = branch.as_bytes();
-
-            ref_map
-                .remote_refs
-                .iter()
-                .find(|r| {
-                    let (name, _, _) = r.unpack();
-                    name == branch_bytes || name == target_head_bytes || name == target_tag_bytes
-                })
-                .ok_or_else(|| CommitHashError::Git("Branch not found".to_string()))?
-                .unpack()
-                .1
-                .map(|id| id.to_string())
-                .ok_or_else(|| CommitHashError::Git("Hash not found for branch".to_string()))
-        });
-
-        match tokio::time::timeout(timeout, fetch_task).await {
-            Ok(Ok(Ok(hash))) => Ok(CommitHash::new(hash)?),
-            Ok(Ok(Err(e))) => Err(e),
-            Ok(Err(e)) => Err(CommitHashError::UnexpectedStatus(format!(
-                "Spawn blocking failed: {}",
-                e
-            ))),
-            Err(_) => Err(CommitHashError::UnexpectedStatus(
-                "Gix operation timed out".to_string(),
-            )),
+        let result = get_latest_hash_inner(&self.repo, self.timeout, repo_url, branch).await;
+        if result.is_err() {
+            tracing::Span::current().record("otel.status_code", "ERROR");
         }
+        result
+    }
+}
+
+/// Internal implementation of [`GitFetcher::get_latest_hash`].
+async fn get_latest_hash_inner(
+    repo: &gix::ThreadSafeRepository,
+    timeout: std::time::Duration,
+    repo_url: &str,
+    branch: &str,
+) -> Result<CommitHash, CommitHashError> {
+    let repo_url = repo_url.to_string();
+    let branch = branch.to_string();
+    let thread_safe_repo = repo.clone();
+
+    let fetch_task = tokio::task::spawn_blocking(move || {
+        let repo = thread_safe_repo.to_thread_local();
+        let mut remote = repo.remote_at(repo_url)?;
+        remote = remote.with_fetch_tags(gix::remote::fetch::Tags::None);
+        remote.replace_refspecs(Some(branch.as_str()), Direction::Fetch)?;
+        let connection = remote.connect(Direction::Fetch)?;
+        let (ref_map, _) = connection.ref_map(Discard, gix::remote::ref_map::Options::default())?;
+
+        let target_head = format!("refs/heads/{}", branch);
+        let target_tag = format!("refs/tags/{}", branch);
+        let target_head_bytes = target_head.as_bytes();
+        let target_tag_bytes = target_tag.as_bytes();
+        let branch_bytes = branch.as_bytes();
+
+        ref_map
+            .remote_refs
+            .iter()
+            .find(|r| {
+                let (name, _, _) = r.unpack();
+                name == branch_bytes || name == target_head_bytes || name == target_tag_bytes
+            })
+            .ok_or_else(|| CommitHashError::Git("Branch not found".to_string()))?
+            .unpack()
+            .1
+            .map(|id| id.to_string())
+            .ok_or_else(|| CommitHashError::Git("Hash not found for branch".to_string()))
+    });
+
+    match tokio::time::timeout(timeout, fetch_task).await {
+        Ok(Ok(Ok(hash))) => Ok(CommitHash::new(hash)?),
+        Ok(Ok(Err(e))) => Err(e),
+        Ok(Err(e)) => Err(CommitHashError::UnexpectedStatus(format!(
+            "Spawn blocking failed: {}",
+            e
+        ))),
+        Err(_) => Err(CommitHashError::UnexpectedStatus(
+            "Gix operation timed out".to_string(),
+        )),
     }
 }

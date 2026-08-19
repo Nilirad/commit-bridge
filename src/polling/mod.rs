@@ -50,8 +50,23 @@ async fn polling_loop(ctx: SharedContext) {
 ///
 /// <!-- LINKS -->
 /// [`TriggerEngine`]: crate::trigger::TriggerEngine
-#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "internal",
+        otel.status_code = tracing::field::Empty,
+    )
+)]
 async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
+    let result = poll_branches_inner(ctx).await;
+    if result.is_err() {
+        tracing::Span::current().record("otel.status_code", "ERROR");
+    }
+    result
+}
+
+/// Internal implementation of [`poll_branches`].
+async fn poll_branches_inner(ctx: &SharedContext) -> Result<(), PollingError> {
     let updated_branches = gather_updated_branches(ctx).await?;
     if updated_branches.is_empty() {
         return Ok(());
@@ -69,8 +84,25 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
 }
 
 /// Gathers stored branches that need to be updated.
-#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "internal",
+        otel.status_code = tracing::field::Empty,
+    )
+)]
 async fn gather_updated_branches(ctx: &SharedContext) -> Result<Vec<BranchInfo>, sqlx::Error> {
+    let result = gather_updated_branches_inner(ctx).await;
+    if result.is_err() {
+        tracing::Span::current().record("otel.status_code", "ERROR");
+    }
+    result
+}
+
+/// Internal implementation of [`gather_updated_branches`].
+async fn gather_updated_branches_inner(
+    ctx: &SharedContext,
+) -> Result<Vec<BranchInfo>, sqlx::Error> {
     let branches = ctx
         .repository
         .branches_get_all()
@@ -127,6 +159,7 @@ async fn process_branches(
     skip_all,
     fields(
         otel.kind = "producer",
+        otel.status_code = tracing::field::Empty,
         branch.id = %branch_info.branch.id,
         branch.repo_url = %branch_info.branch.repo_url.as_str(),
         branch.name = %branch_info.branch.name.as_str(),
@@ -135,6 +168,19 @@ async fn process_branches(
     )
 )]
 async fn process_single_branch(
+    repo: std::sync::Arc<crate::repository::SqliteRepository>,
+    branch_info: &branch::BranchInfo,
+    tx: &mut sqlx::SqliteConnection,
+) -> Result<(), RepositoryError> {
+    let result = process_single_branch_inner(repo, branch_info, tx).await;
+    if result.is_err() {
+        tracing::Span::current().record("otel.status_code", "ERROR");
+    }
+    result
+}
+
+/// Internal implementation of [`process_single_branch`].
+async fn process_single_branch_inner(
     repo: std::sync::Arc<crate::repository::SqliteRepository>,
     branch_info: &branch::BranchInfo,
     tx: &mut sqlx::SqliteConnection,
