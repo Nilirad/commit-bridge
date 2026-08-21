@@ -48,8 +48,22 @@ async fn polling_loop(ctx: SharedContext) {
 /// updates them in the `branches` table,
 /// and queues the updates for the [`TriggerEngine`].
 ///
+/// Only enters an instrumented span when updates are found,
+/// so that empty polling cycles do not produce exported spans.
+///
 /// <!-- LINKS -->
 /// [`TriggerEngine`]: crate::trigger::TriggerEngine
+async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
+    let updated_branches = gather_updated_branches(ctx).await?;
+    if updated_branches.is_empty() {
+        return Ok(());
+    }
+
+    process_branch_updates(ctx, updated_branches).await
+}
+
+/// Applies branch updates in the `branches` table
+/// and queues triggers for the updated branches.
 #[tracing::instrument(
     skip_all,
     fields(
@@ -57,21 +71,22 @@ async fn polling_loop(ctx: SharedContext) {
         otel.status_code = tracing::field::Empty,
     )
 )]
-async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
-    let result = poll_branches_inner(ctx).await;
+async fn process_branch_updates(
+    ctx: &SharedContext,
+    updated_branches: Vec<BranchInfo>,
+) -> Result<(), PollingError> {
+    let result = process_branch_updates_inner(ctx, updated_branches).await;
     if result.is_err() {
         tracing::Span::current().record("otel.status_code", "ERROR");
     }
     result
 }
 
-/// Internal implementation of [`poll_branches`].
-async fn poll_branches_inner(ctx: &SharedContext) -> Result<(), PollingError> {
-    let updated_branches = gather_updated_branches(ctx).await?;
-    if updated_branches.is_empty() {
-        return Ok(());
-    }
-
+/// Internal implementation of [`process_branch_updates`].
+async fn process_branch_updates_inner(
+    ctx: &SharedContext,
+    updated_branches: Vec<BranchInfo>,
+) -> Result<(), PollingError> {
     let repository = ctx.repository.clone();
     let shared_branches = std::sync::Arc::new(updated_branches);
     ctx.repository
@@ -84,25 +99,7 @@ async fn poll_branches_inner(ctx: &SharedContext) -> Result<(), PollingError> {
 }
 
 /// Gathers stored branches that need to be updated.
-#[tracing::instrument(
-    skip_all,
-    fields(
-        otel.kind = "internal",
-        otel.status_code = tracing::field::Empty,
-    )
-)]
 async fn gather_updated_branches(ctx: &SharedContext) -> Result<Vec<BranchInfo>, sqlx::Error> {
-    let result = gather_updated_branches_inner(ctx).await;
-    if result.is_err() {
-        tracing::Span::current().record("otel.status_code", "ERROR");
-    }
-    result
-}
-
-/// Internal implementation of [`gather_updated_branches`].
-async fn gather_updated_branches_inner(
-    ctx: &SharedContext,
-) -> Result<Vec<BranchInfo>, sqlx::Error> {
     let branches = ctx
         .repository
         .branches_get_all()

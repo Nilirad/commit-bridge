@@ -55,6 +55,23 @@ async fn trigger_loop(engine: &TriggerEngine) {
 }
 
 /// Processes a single queued event.
+///
+/// Only enters an instrumented span when a trigger is actually found,
+/// so that empty polling cycles do not produce exported spans.
+async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
+    let Some(trigger) = engine
+        .ctx
+        .repository
+        .trigger_queue_process_oldest_pending()
+        .await?
+    else {
+        return Ok(());
+    };
+
+    process_trigger(engine, trigger).await
+}
+
+/// Processes a single queued trigger.
 #[tracing::instrument(
     skip_all,
     fields(
@@ -70,25 +87,22 @@ async fn trigger_loop(engine: &TriggerEngine) {
         trigger.retry_count = tracing::field::Empty,
     )
 )]
-async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
-    let result = process_queue_inner(engine).await;
+async fn process_trigger(
+    engine: &TriggerEngine,
+    trigger: TriggerQueueItem,
+) -> Result<(), WorkflowTriggerError> {
+    let result = process_trigger_inner(engine, trigger).await;
     if result.is_err() {
         tracing::Span::current().record("otel.status_code", "ERROR");
     }
     result
 }
 
-/// Internal implementation of [`process_queue`].
-async fn process_queue_inner(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
-    let Some(trigger) = engine
-        .ctx
-        .repository
-        .trigger_queue_process_oldest_pending()
-        .await?
-    else {
-        return Ok(());
-    };
-
+/// Internal implementation of [`process_trigger`].
+async fn process_trigger_inner(
+    engine: &TriggerEngine,
+    trigger: TriggerQueueItem,
+) -> Result<(), WorkflowTriggerError> {
     crate::telemetry::add_link_from_serialized_context(
         &tracing::Span::current(),
         trigger.span_context.as_deref(),
