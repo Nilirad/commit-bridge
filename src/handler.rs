@@ -1,23 +1,23 @@
 //! Axum route handlers.
 
-// Needed to bypass a warning raised inside the `#[rovo]` macro.
+// Needed to bypass a warning
+// raised by code generated inside the `#[rovo]` macro,
+// used by CRUD submodules.
 #![allow(missing_docs, clippy::missing_docs_in_private_items)]
 
-use crate::error::HandlerError;
-use crate::model::{
-    CreateSubscription, HalLink, SubscriptionHal, SubscriptionLinks, SubscriptionPage,
-    SubscriptionPageLinks, SubscriptionWithBranch, UpdateSubscription,
-};
-use crate::repository::subscription::SubscriptionRepository;
+pub mod create;
+pub mod delete;
+pub mod get;
+pub mod list;
+pub mod update;
 
-use crate::state::AppState;
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-};
-use rovo::rovo;
-use serde::Deserialize;
-use tracing::{info, instrument};
+pub use create::create_subscription;
+pub use delete::delete_subscription;
+pub use get::get_subscription;
+pub use list::list_subscriptions;
+pub use update::update_subscription;
+
+use crate::model::{HalLink, SubscriptionHal, SubscriptionLinks, SubscriptionWithBranch};
 
 /// Maps a [`SubscriptionWithBranch`] to its HAL representation.
 fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
@@ -39,272 +39,6 @@ fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
     }
 }
 
-/// Create a new subscription mapping.
-///
-/// Creates a new subscription mapping between a source branch and a target repository.
-///
-/// # Responses
-///
-/// 201: Json<SubscriptionHal> - Subscription created successfully
-/// 401: () - Unauthorized
-/// 408: () - Request timeout
-/// 422: () - Validation error
-/// 500: () - Internal server error
-///
-/// # Metadata
-///
-/// @tag subscriptions
-#[allow(rustdoc::invalid_html_tags)]
-#[rovo]
-#[instrument(skip_all, fields(
-    otel.kind = "internal",
-    payload.source_repo_url = %payload.source_repo_url.as_str(),
-    payload.source_branch_name = %payload.source_branch_name.as_str(),
-    payload.target_repo = %payload.target_repo.as_str(),
-    payload.event_type = %payload.event_type.as_str(),
-    payload.gh_app_installation_id = %payload.gh_app_installation_id,
-))]
-pub async fn create_subscription(
-    state: State<AppState>,
-    payload: Json<CreateSubscription>,
-) -> Result<Json<SubscriptionHal>, HandlerError> {
-    create_subscription_inner(state, payload).await
-}
-
-/// Internal implementation of [`create_subscription`].
-async fn create_subscription_inner(
-    State(state): State<AppState>,
-    Json(payload): Json<CreateSubscription>,
-) -> Result<Json<SubscriptionHal>, HandlerError> {
-    let sub_with_branch = state.repository.subscriptions_create(&payload).await?;
-
-    info!(
-        "Registered new subscription for branch ID {} (repo: {}, branch: {}): {:?}",
-        sub_with_branch.subscription.branch_id,
-        sub_with_branch.source_branch.repo_url,
-        sub_with_branch.source_branch.name,
-        sub_with_branch.subscription
-    );
-
-    Ok(Json(map_to_hal(sub_with_branch)))
-}
-
-/// Query parameters for listing subscriptions.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct ListSubscriptionsQuery {
-    /// Maximum number of subscriptions to return.
-    pub limit: Option<usize>,
-    /// The ID of the last subscription in the previous page.
-    pub last_id: Option<i64>,
-}
-
-/// List subscriptions.
-///
-/// Returns a paginated list of all subscription mappings in the system.
-///
-/// # Query Parameters
-///
-/// - `limit`: The maximum number of subscriptions to return.
-/// - `last_id`: The ID of the last subscription in the previous page.
-///
-/// # Responses
-///
-/// 200: Json<SubscriptionPage> - Paginated list of subscriptions
-/// 401: () - Unauthorized
-/// 408: () - Request timeout
-/// 500: () - Internal server error
-///
-/// # Metadata
-///
-/// @tag subscriptions
-#[allow(rustdoc::invalid_html_tags)]
-#[rovo]
-#[instrument(skip_all, fields(
-    otel.kind = "internal",
-    query.limit = ?query.limit,
-    query.last_id = ?query.last_id,
-))]
-pub async fn list_subscriptions(
-    state: State<AppState>,
-    query: Query<ListSubscriptionsQuery>,
-) -> Result<Json<SubscriptionPage>, HandlerError> {
-    list_subscriptions_inner(state, query).await
-}
-
-/// Internal implementation of [`list_subscriptions`].
-async fn list_subscriptions_inner(
-    State(state): State<AppState>,
-    Query(query): Query<ListSubscriptionsQuery>,
-) -> Result<Json<SubscriptionPage>, HandlerError> {
-    let limit = query
-        .limit
-        .unwrap_or(state.config.database.subscriptions_list_limit)
-        .min(state.config.database.subscriptions_list_limit_cap);
-    let last_id = query.last_id.unwrap_or_default();
-
-    let subscriptions = state
-        .repository
-        .subscriptions_list_paginated(last_id, limit as i64)
-        .await?;
-
-    let data: Vec<SubscriptionHal> = subscriptions.into_iter().map(map_to_hal).collect();
-
-    let next_id = data.last().map(|s| s.subscription.id).unwrap_or(last_id);
-    let remaining_count = state
-        .repository
-        .subscriptions_count_remaining(next_id)
-        .await?;
-
-    let next_link = data
-        .last()
-        .filter(|_| remaining_count > 0)
-        .map(|s| HalLink {
-            href: format!(
-                "/subscriptions?limit={}&last_id={}",
-                limit, s.subscription.id
-            ),
-        });
-
-    Ok(Json(SubscriptionPage {
-        data,
-        remaining_count,
-        links: SubscriptionPageLinks { next: next_link },
-    }))
-}
-
-/// Get a single subscription.
-///
-/// Retrieve a subscription mapping by its ID.
-///
-/// # Path Parameters
-///
-/// id: The unique identifier of the subscription
-///
-/// # Responses
-///
-/// 200: Json<SubscriptionHal> - Successfully retrieved the subscription
-/// 401: () - Unauthorized
-/// 404: () - Subscription was not found
-/// 408: () - Request timeout
-/// 500: () - Internal server error
-///
-/// # Metadata
-///
-/// @tag subscriptions
-#[allow(rustdoc::invalid_html_tags)]
-#[rovo]
-#[instrument(skip_all, fields(otel.kind = "internal", id = %id))]
-pub async fn get_subscription(
-    state: State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<Json<SubscriptionHal>, HandlerError> {
-    get_subscription_inner(state, Path(id)).await
-}
-
-/// Internal implementation of [`get_subscription`].
-async fn get_subscription_inner(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<Json<SubscriptionHal>, HandlerError> {
-    let sub_with_branch = state
-        .repository
-        .subscriptions_get_by_id_with_branch(id)
-        .await?
-        .ok_or(HandlerError::NotFound)?;
-    Ok(Json(map_to_hal(sub_with_branch)))
-}
-
-/// Update an existing subscription.
-///
-/// Updates the target repository, event type, and/or GitHub App installation ID of a subscription.
-///
-/// # Path Parameters
-///
-/// id: The unique identifier of the subscription to update
-///
-/// # Responses
-///
-/// 200: Json<SubscriptionHal> - Subscription updated successfully
-/// 401: () - Unauthorized
-/// 404: () - Subscription was not found
-/// 408: () - Request timeout
-/// 422: () - Validation error
-/// 500: () - Internal server error
-///
-/// # Metadata
-///
-/// @tag subscriptions
-#[allow(rustdoc::invalid_html_tags)]
-#[rovo]
-#[instrument(skip_all, fields(
-    otel.kind = "internal",
-    id = %id,
-    payload.target_repo = ?payload.target_repo.as_ref().map(|v| v.as_str()),
-    payload.event_type = ?payload.event_type.as_ref().map(|v| v.as_str()),
-    payload.gh_app_installation_id = ?payload.gh_app_installation_id,
-))]
-pub async fn update_subscription(
-    state: State<AppState>,
-    Path(id): Path<i64>,
-    payload: Json<UpdateSubscription>,
-) -> Result<Json<SubscriptionHal>, HandlerError> {
-    update_subscription_inner(state, Path(id), payload).await
-}
-
-/// Internal implementation of [`update_subscription`].
-async fn update_subscription_inner(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-    Json(payload): Json<UpdateSubscription>,
-) -> Result<Json<SubscriptionHal>, HandlerError> {
-    state.repository.subscriptions_update(id, &payload).await?;
-    let sub_with_branch = state
-        .repository
-        .subscriptions_get_by_id_with_branch(id)
-        .await?
-        .ok_or(HandlerError::NotFound)?;
-
-    Ok(Json(map_to_hal(sub_with_branch)))
-}
-
-/// Delete a subscription.
-///
-/// Permanently deletes a subscription mapping by its ID.
-///
-/// # Path Parameters
-///
-/// id: The unique identifier of the subscription to delete
-///
-/// # Responses
-///
-/// 204: () - Subscription deleted successfully
-/// 401: () - Unauthorized
-/// 404: () - Subscription was not found
-/// 408: () - Request timeout
-/// 500: () - Internal server error
-///
-/// # Metadata
-///
-/// @tag subscriptions
-#[allow(rustdoc::invalid_html_tags)]
-#[rovo]
-#[instrument(skip_all, fields(otel.kind = "internal", id = %id))]
-pub async fn delete_subscription(
-    state: State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<(), HandlerError> {
-    delete_subscription_inner(state, Path(id)).await
-}
-
-/// Internal implementation of [`delete_subscription`].
-async fn delete_subscription_inner(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<(), HandlerError> {
-    state.repository.subscriptions_delete(id).await?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -315,13 +49,18 @@ mod tests {
         clippy::indexing_slicing
     )]
 
-    use super::*;
+    use super::create::create_subscription_inner;
+    use super::delete::delete_subscription_inner;
+    use super::get::get_subscription_inner;
+    use super::list::{ListSubscriptionsQuery, list_subscriptions_inner};
+    use super::update::update_subscription_inner;
     use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
-    use crate::model::CreateSubscription;
+    use crate::error::HandlerError;
+    use crate::model::{CreateSubscription, UpdateSubscription};
     use crate::state::AppState;
     use crate::test_utils::create_test_db;
     use axum::Json;
-    use axum::extract::State;
+    use axum::extract::{Path, Query, State};
 
     #[tokio::test]
     async fn test_crud_subscription() {
