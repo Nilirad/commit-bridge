@@ -1,4 +1,4 @@
-use crate::HttpRequestOnResponse;
+use crate::http::router::HttpRequestOnResponse;
 use axum::http::StatusCode;
 
 #[test]
