@@ -536,7 +536,6 @@ mod tests {
                 repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(
                     pool.clone(),
                 )),
-                db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 git_fetcher: Arc::new(MockGitFetcher {
                     hash: CommitHash::new("a".repeat(40)).unwrap(),
@@ -623,7 +622,6 @@ mod tests {
                 repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(
                     pool.clone(),
                 )),
-                db_pool: pool.clone(),
                 token: CancellationToken::new(),
                 git_fetcher: Arc::new(MockGitFetcher {
                     hash: CommitHash::new("a".repeat(40)).unwrap(),

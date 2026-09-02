@@ -16,7 +16,7 @@ async fn test_auth_no_key_configured_fails() {
     config.auth.allow_unauthenticated = false;
 
     let repository = Arc::new(SqliteRepository::new(pool.clone()));
-    let app = build_router(repository, pool, &config);
+    let app = build_router(repository, &config);
 
     let response = app
         .oneshot(
@@ -40,7 +40,7 @@ async fn test_auth_allowed_unauthenticated_success() {
     config.auth.allow_unauthenticated = true;
 
     let repository = Arc::new(SqliteRepository::new(pool.clone()));
-    let app = build_router(repository, pool, &config);
+    let app = build_router(repository, &config);
 
     let response = app
         .oneshot(
@@ -63,7 +63,7 @@ async fn test_auth_key_configured_success() {
     config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
     let repository = Arc::new(SqliteRepository::new(pool.clone()));
-    let app = build_router(repository, pool, &config);
+    let app = build_router(repository, &config);
 
     let response = app
         .oneshot(
@@ -87,7 +87,7 @@ async fn test_auth_key_configured_mismatch() {
     config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
     let repository = Arc::new(SqliteRepository::new(pool.clone()));
-    let app = build_router(repository, pool, &config);
+    let app = build_router(repository, &config);
 
     let response = app
         .oneshot(
@@ -111,7 +111,7 @@ async fn test_auth_key_configured_missing() {
     config.auth.api_key = Some(NonEmptyString::new("secret".to_string()).unwrap());
 
     let repository = Arc::new(SqliteRepository::new(pool.clone()));
-    let app = build_router(repository, pool, &config);
+    let app = build_router(repository, &config);
 
     let response = app
         .oneshot(

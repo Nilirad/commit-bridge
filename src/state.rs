@@ -14,7 +14,4 @@ pub struct AppState {
 
     /// Repository for data access.
     pub repository: Arc<SqliteRepository>,
-
-    /// SQLx connection pool for the SQLite database.
-    pub db_pool: sqlx::SqlitePool,
 }
