@@ -8,7 +8,9 @@ use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
 use thiserror::Error;
 use tracing::{error, warn};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    EnvFilter, Layer, filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt,
+};
 
 /// Name used for the OpenTelemetry tracer.
 const TRACER_NAME: &str = "commit-bridge";
@@ -19,7 +21,11 @@ const TRACER_NAME: &str = "commit-bridge";
 /// plus slow SQL statements (`sqlx::query` at `warn` level, which
 /// includes the `db.statement` attribute in exported spans).
 /// Set `RUST_LOG=debug` (or narrower targets such as `sqlx::query=debug`)
-/// to enrich spans with per-query details.
+/// to enrich console logs with per-query details.
+///
+/// `RUST_LOG` only affects console logs:
+/// exported spans are filtered independently
+/// (see [`init`]).
 const DEFAULT_RUST_LOG: &str = "commit_bridge=info,sqlx::query=warn";
 
 /// Guard that gracefully shuts down the tracer provider on drop.
@@ -40,6 +46,8 @@ impl Drop for TelemetryGuard {
 }
 
 /// Sets up the global OpenTelemetry propagator and tracing subscriber.
+///
+/// Exports spans and events at `info` level or above.
 pub fn init() -> TelemetryGuard {
     global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
 
@@ -55,9 +63,8 @@ pub fn init() -> TelemetryGuard {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new(DEFAULT_RUST_LOG));
 
     tracing_subscriber::registry()
-        .with(env_filter)
-        .with(tracing_subscriber::fmt::layer())
-        .with(otel_layer)
+        .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
+        .with(otel_layer.with_filter(LevelFilter::INFO))
         .init();
 
     if let Err(reason) = &tracer_provider {
