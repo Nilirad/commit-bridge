@@ -56,8 +56,8 @@ mod tests {
     use super::update::update_subscription_inner;
     use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
     use crate::error::HandlerError;
+    use crate::http::state::AppState;
     use crate::model::{CreateSubscription, UpdateSubscription};
-    use crate::state::AppState;
     use crate::test_utils::create_test_db;
     use axum::Json;
     use axum::extract::{Path, Query, State};

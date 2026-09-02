@@ -1,8 +1,8 @@
 //! Delete a subscription handler.
 
 use crate::error::HandlerError;
+use crate::http::state::AppState;
 use crate::repository::subscription::SubscriptionRepository;
-use crate::state::AppState;
 use axum::extract::{Path, State};
 use rovo::rovo;
 use tracing::instrument;

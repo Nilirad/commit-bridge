@@ -1,5 +1,6 @@
 use crate::{
-    build_router, domain::NonEmptyString, repository::SqliteRepository, test_utils::create_test_db,
+    domain::NonEmptyString, http::router::build_router, repository::SqliteRepository,
+    test_utils::create_test_db,
 };
 use axum::{
     body::Body,

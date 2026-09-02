@@ -1,4 +1,4 @@
-use crate::{build_router, repository::SqliteRepository, test_utils::create_test_db};
+use crate::{http::router::build_router, repository::SqliteRepository, test_utils::create_test_db};
 use axum::{
     body::Body,
     http::{Request, StatusCode},

@@ -1,7 +1,7 @@
 use dudect_bencher::{BenchRng, Class, CtRunner, ctbench_main};
 
 use commit_bridge::domain::NonEmptyString;
-use commit_bridge::verify_api_key;
+use commit_bridge::http::router::verify_api_key;
 use dudect_bencher::rand::RngExt;
 use rand::distr::{Alphanumeric, SampleString};
 

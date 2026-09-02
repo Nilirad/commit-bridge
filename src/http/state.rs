@@ -6,7 +6,7 @@ use std::sync::Arc;
 /// Holds data accessible from each [handler].
 ///
 /// <!-- LINKS -->
-/// [handler]: crate::handler
+/// [handler]: crate::http::handler
 #[derive(Debug, Clone)]
 pub struct AppState {
     /// Application configuration.
