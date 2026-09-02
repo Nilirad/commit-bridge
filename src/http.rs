@@ -2,7 +2,7 @@
 
 pub mod handler;
 pub mod router;
-pub mod server;
+pub(crate) mod server;
 pub mod state;
 
 use reqwest::Client;
