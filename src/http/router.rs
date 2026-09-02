@@ -21,11 +21,11 @@ use tracing::Span;
 use crate::{
     config::Config,
     domain::NonEmptyString,
-    handler::{
+    http::handler::{
         create_subscription, delete_subscription, get_subscription, list_subscriptions,
         update_subscription,
     },
-    state::AppState,
+    http::state::AppState,
 };
 
 /// Middleware to authorize requests with an API key.

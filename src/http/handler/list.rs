@@ -2,9 +2,9 @@
 
 use super::map_to_hal;
 use crate::error::HandlerError;
+use crate::http::state::AppState;
 use crate::model::{HalLink, SubscriptionHal, SubscriptionPage, SubscriptionPageLinks};
 use crate::repository::subscription::SubscriptionRepository;
-use crate::state::AppState;
 use axum::{
     Json,
     extract::{Query, State},
