@@ -48,6 +48,9 @@ async fn polling_loop(ctx: SharedContext) {
 /// updates them in the `branches` table,
 /// and queues the updates for the [`TriggerEngine`].
 ///
+/// Only enters an instrumented span when updates are found,
+/// so that empty polling cycles do not produce exported spans.
+///
 /// <!-- LINKS -->
 /// [`TriggerEngine`]: crate::trigger::TriggerEngine
 async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
@@ -56,6 +59,34 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
         return Ok(());
     }
 
+    process_branch_updates(ctx, updated_branches).await
+}
+
+/// Applies branch updates in the `branches` table
+/// and queues triggers for the updated branches.
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "internal",
+        otel.status_code = tracing::field::Empty,
+    )
+)]
+async fn process_branch_updates(
+    ctx: &SharedContext,
+    updated_branches: Vec<BranchInfo>,
+) -> Result<(), PollingError> {
+    let result = process_branch_updates_inner(ctx, updated_branches).await;
+    if result.is_err() {
+        tracing::Span::current().record("otel.status_code", "ERROR");
+    }
+    result
+}
+
+/// Internal implementation of [`process_branch_updates`].
+async fn process_branch_updates_inner(
+    ctx: &SharedContext,
+    updated_branches: Vec<BranchInfo>,
+) -> Result<(), PollingError> {
     let repository = ctx.repository.clone();
     let shared_branches = std::sync::Arc::new(updated_branches);
     ctx.repository
@@ -69,7 +100,9 @@ async fn poll_branches(ctx: &SharedContext) -> Result<(), PollingError> {
 
 /// Gathers stored branches that need to be updated.
 async fn gather_updated_branches(ctx: &SharedContext) -> Result<Vec<BranchInfo>, sqlx::Error> {
-    let branches = BranchRepository::get_all(ctx.repository.as_ref())
+    let branches = ctx
+        .repository
+        .branches_get_all()
         .await
         .map_err(|e| match e {
             crate::repository::RepositoryError::Database(e) => e,
@@ -105,6 +138,7 @@ fn execute_branch_updates<'a>(
 }
 
 /// Processes branch updates within a transaction.
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 async fn process_branches(
     repo: std::sync::Arc<crate::repository::SqliteRepository>,
     shared_branches: std::sync::Arc<Vec<branch::BranchInfo>>,
@@ -112,17 +146,58 @@ async fn process_branches(
 ) -> Result<(), RepositoryError> {
     let branches = std::sync::Arc::clone(&shared_branches);
     for branch_info in branches.iter() {
-        repo.update_last_commit_hash_in_tx(branch_info.branch.id, &branch_info.latest_hash, tx)
-            .await?;
-
-        info!(
-            "New commit detected for branch {}. Hash: {}",
-            branch_info.branch.name, branch_info.latest_hash
-        );
-
-        repo.queue_triggers_for_branch(branch_info.branch.id, &branch_info.latest_hash, tx)
-            .await?;
+        process_single_branch(repo.clone(), branch_info, tx).await?;
     }
+    Ok(())
+}
+
+/// Processes a single branch update within a transaction.
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "producer",
+        otel.status_code = tracing::field::Empty,
+        branch.id = %branch_info.branch.id,
+        branch.repo_url = %branch_info.branch.repo_url.as_str(),
+        branch.name = %branch_info.branch.name.as_str(),
+        branch.last_commit_hash = ?branch_info.branch.last_commit_hash.as_deref(),
+        latest_hash = %branch_info.latest_hash.as_str(),
+    )
+)]
+async fn process_single_branch(
+    repo: std::sync::Arc<crate::repository::SqliteRepository>,
+    branch_info: &branch::BranchInfo,
+    tx: &mut sqlx::SqliteConnection,
+) -> Result<(), RepositoryError> {
+    let result = process_single_branch_inner(repo, branch_info, tx).await;
+    if result.is_err() {
+        tracing::Span::current().record("otel.status_code", "ERROR");
+    }
+    result
+}
+
+/// Internal implementation of [`process_single_branch`].
+async fn process_single_branch_inner(
+    repo: std::sync::Arc<crate::repository::SqliteRepository>,
+    branch_info: &branch::BranchInfo,
+    tx: &mut sqlx::SqliteConnection,
+) -> Result<(), RepositoryError> {
+    repo.branches_update_last_commit_hash(branch_info.branch.id, &branch_info.latest_hash, tx)
+        .await?;
+
+    info!(
+        "New commit detected for branch {}. Hash: {}",
+        branch_info.branch.name, branch_info.latest_hash
+    );
+
+    let span_context = crate::telemetry::serialize_current_span_context();
+
+    let trigger_params = crate::repository::trigger::TriggerQueueUpsertParams {
+        branch_id: branch_info.branch.id,
+        new_hash: &branch_info.latest_hash,
+        span_context: span_context.as_deref(),
+    };
+    repo.trigger_queue_upsert(trigger_params, tx).await?;
     Ok(())
 }
 

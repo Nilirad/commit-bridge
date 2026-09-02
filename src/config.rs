@@ -35,23 +35,16 @@ pub struct Config {
     /// Git-related configuration settings.
     #[validate(nested)]
     pub git: GitConfig,
+
+    /// Telemetry-related configuration settings.
+    #[serde(default)]
+    #[validate(nested)]
+    pub telemetry: TelemetryConfig,
 }
 
 impl Config {
     /// Bootstraps the application configuration from the environment.
     pub fn load() -> Result<Self, FatalError> {
-        if dotenvy::dotenv().is_ok() {
-            #[cfg(debug_assertions)]
-            tracing::info!("Successfully loaded local `.env` file.");
-
-            #[cfg(not(debug_assertions))]
-            tracing::warn!(
-                "Successfully loaded local `.env` file. \
-                If this is a production build, \
-                environment variables should be set prior to execution."
-            );
-        }
-
         let environment = Environment::with_prefix("CBRIDGE")
             .separator("__")
             .try_parsing(true);
@@ -249,4 +242,15 @@ pub struct GitConfig {
     /// Path to initialize or open the gix repository.
     #[validate(custom(function = "validate_gix_repo_path"))]
     pub repo_path: PathBuf,
+}
+
+/// Configuration for telemetry and observability.
+#[derive(Clone, Debug, Default, Deserialize, Validate)]
+pub struct TelemetryConfig {
+    /// Mark client error responses (4xx) as errors in exported traces.
+    ///
+    /// `false` by default.
+    /// Server errors (5xx) are marked as errors anyways.
+    #[serde(default)]
+    pub mark_client_errors_as_error: bool,
 }

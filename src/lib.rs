@@ -5,16 +5,18 @@
     clippy::expect_used,
     clippy::todo,
     clippy::unimplemented,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    clippy::undocumented_unsafe_blocks
 )]
 
 use std::fs;
 use std::str::FromStr;
+use std::time::Duration;
 
 use axum::{
     Router,
     body::Body,
-    extract::State,
+    extract::{MatchedPath, State},
     http::{HeaderValue, Request, Response, StatusCode, header},
     middleware::{self, Next},
     response::IntoResponse,
@@ -30,7 +32,8 @@ use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_http::timeout::TimeoutLayer;
-use tracing::info;
+use tower_http::trace::{MakeSpan, OnResponse, TraceLayer};
+use tracing::{Span, info};
 
 use crate::{
     config::Config,
@@ -58,6 +61,7 @@ pub mod model;
 pub mod polling;
 pub mod repository;
 pub mod state;
+pub mod telemetry;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]
@@ -92,7 +96,28 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
 
     let app = build_router(repository, pool, &config);
 
-    run_server(app, &ctx.config, token.clone()).await
+    run_server(app, &ctx.config, token.clone()).await?;
+
+    Ok(())
+}
+
+/// Logs the outcome of the `.env` file load.
+///
+/// Must only be called after the tracing subscriber is initialized.
+pub fn log_dotenv_status(loaded: bool) {
+    if !loaded {
+        return;
+    }
+
+    #[cfg(debug_assertions)]
+    tracing::info!("Successfully loaded local `.env` file.");
+
+    #[cfg(not(debug_assertions))]
+    tracing::warn!(
+        "Successfully loaded local `.env` file. \
+        If this is a production build, \
+        environment variables should be set prior to execution."
+    );
 }
 
 /// Initializes the database pool.
@@ -162,6 +187,10 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
 }
 
 /// Middleware to authorize requests with an API key.
+///
+/// Records the `authenticated` attribute onto the `http.request` span
+/// (the span is current while this middleware runs,
+/// since it is layered below the `TraceLayer`).
 async fn auth_middleware(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -174,8 +203,11 @@ async fn auth_middleware(
         let auth_header = req.headers().get("X-API-KEY").and_then(|v| v.to_str().ok());
 
         if !verify_api_key(state.config.auth.api_key.as_ref(), auth_header) {
+            tracing::Span::current().record("authenticated", false);
             return StatusCode::UNAUTHORIZED.into_response();
         }
+
+        tracing::Span::current().record("authenticated", true);
     }
 
     next.run(req).await
@@ -214,12 +246,87 @@ async fn set_no_cache_header(req: Request<Body>, next: Next) -> Response<Body> {
     response
 }
 
+/// Records the matched route path (`http.route`)
+/// onto the current HTTP request span.
+///
+/// Runs after routing, so the [`MatchedPath`] extension is available.
+async fn record_http_route(req: Request<Body>, next: Next) -> Response<Body> {
+    if let Some(matched) = req.extensions().get::<MatchedPath>() {
+        tracing::Span::current().record("http.route", matched.as_str());
+    }
+    next.run(req).await
+}
+
 #[allow(missing_docs, clippy::missing_docs_in_private_items)]
 mod health_handler {
     use super::*;
     #[rovo]
+    #[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
     pub async fn health_check(State(_state): State<AppState>) -> &'static str {
         "CommitBridge is alive"
+    }
+}
+
+/// Span factory for incoming HTTP requests,
+/// following OpenTelemetry semantic conventions.
+///
+/// The span is created within this crate
+/// (instead of using the default `tower_http` span factory)
+/// so that its attributes follow OpenTelemetry conventions.
+#[derive(Clone, Copy)]
+struct HttpRequestSpan;
+
+impl<B> MakeSpan<B> for HttpRequestSpan {
+    fn make_span(&mut self, request: &Request<B>) -> Span {
+        tracing::info_span!(
+            "http.request",
+            otel.kind = "server",
+            http.request.method = %request.method(),
+            url.path = %request.uri().path(),
+            http.route = tracing::field::Empty,
+            http.response.status_code = tracing::field::Empty,
+            otel.status_code = tracing::field::Empty,
+            error.type = tracing::field::Empty,
+            authenticated = tracing::field::Empty,
+        )
+    }
+}
+
+/// Records HTTP response metadata onto the request span,
+/// following OpenTelemetry semantic conventions.
+///
+/// Must be used with [`HttpRequestSpan`],
+/// which declares the fields recorded here.
+#[derive(Clone, Copy)]
+pub(crate) struct HttpRequestOnResponse {
+    /// Whether client error responses (4xx)
+    /// should be marked as errors in exported traces.
+    mark_client_errors: bool,
+}
+
+impl HttpRequestOnResponse {
+    /// Creates a new [`HttpRequestOnResponse`].
+    pub(crate) const fn new(mark_client_errors: bool) -> Self {
+        Self { mark_client_errors }
+    }
+
+    /// Returns `true` if the response status should be marked as an error
+    /// in exported traces.
+    ///
+    /// Server errors (5xx) are always marked;
+    /// client errors (4xx) are only marked when `mark_client_errors` is set.
+    pub(crate) fn should_mark_error(&self, status: StatusCode) -> bool {
+        status.is_server_error() || (self.mark_client_errors && status.is_client_error())
+    }
+}
+
+impl<B> OnResponse<B> for HttpRequestOnResponse {
+    fn on_response(self, response: &Response<B>, _latency: Duration, span: &Span) {
+        span.record("http.response.status_code", response.status().as_u16());
+        if self.should_mark_error(response.status()) {
+            span.record("otel.status_code", "ERROR");
+            span.record("error.type", response.status().as_u16().to_string());
+        }
     }
 }
 
@@ -261,10 +368,18 @@ pub fn build_router(
         .finish()
         .layer(middleware::from_fn_with_state(state, auth_middleware))
         .layer(middleware::from_fn(set_no_cache_header))
+        .layer(middleware::from_fn(record_http_route))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             config.server.in_request_timeout,
         ))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(HttpRequestSpan)
+                .on_response(HttpRequestOnResponse::new(
+                    config.telemetry.mark_client_errors_as_error,
+                )),
+        )
 }
 
 /// Runs the server.

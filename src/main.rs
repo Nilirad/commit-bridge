@@ -5,29 +5,34 @@
     clippy::expect_used,
     clippy::todo,
     clippy::unimplemented,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    clippy::undocumented_unsafe_blocks
 )]
 
-use commit_bridge::run_app;
+use commit_bridge::{log_dotenv_status, run_app, telemetry};
+use dotenvy::dotenv;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
-
-    #[cfg(debug_assertions)]
-    tracing::warn!("APPLICATION IS RUNNING IN DEBUG MODE.");
-
     let tracker = TaskTracker::new();
     let token = CancellationToken::new();
 
-    run_app(&tracker, &token)
-        .await
-        .unwrap_or_else(|e| error!("{e}"));
+    let dotenv_loaded = dotenv().is_ok();
+    let tracer_guard = telemetry::init();
+    log_dotenv_status(dotenv_loaded);
+
+    let result = run_app(&tracker, &token).await;
 
     token.cancel();
     tracker.close();
     tracker.wait().await;
-    info!("All systems terminated. Terminating process.")
+
+    match result {
+        Ok(()) => info!("All systems terminated. Terminating process."),
+        Err(e) => error!("{e}"),
+    }
+
+    drop(tracer_guard);
 }

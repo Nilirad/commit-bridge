@@ -55,38 +55,117 @@ async fn trigger_loop(engine: &TriggerEngine) {
 }
 
 /// Processes a single queued event.
+///
+/// Only enters an instrumented span when a trigger is actually found,
+/// so that empty polling cycles do not produce exported spans.
 async fn process_queue(engine: &TriggerEngine) -> Result<(), WorkflowTriggerError> {
     let Some(trigger) = engine
         .ctx
         .repository
-        .find_oldest_pending_and_mark_processing()
+        .trigger_queue_process_oldest_pending()
         .await?
     else {
         return Ok(());
     };
 
+    process_trigger(engine, trigger).await
+}
+
+/// Processes a single queued trigger.
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "consumer",
+        otel.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+        trigger.id = tracing::field::Empty,
+        trigger.branch_id = tracing::field::Empty,
+        trigger.new_hash = tracing::field::Empty,
+        trigger.target_repo = tracing::field::Empty,
+        trigger.event_type = tracing::field::Empty,
+        trigger.gh_app_installation_id = tracing::field::Empty,
+        trigger.retry_count = tracing::field::Empty,
+    )
+)]
+async fn process_trigger(
+    engine: &TriggerEngine,
+    trigger: TriggerQueueItem,
+) -> Result<(), WorkflowTriggerError> {
+    let result = process_trigger_inner(engine, trigger).await;
+    if result.is_err() {
+        tracing::Span::current().record("otel.status_code", "ERROR");
+    }
+    result
+}
+
+/// Internal implementation of [`process_trigger`].
+async fn process_trigger_inner(
+    engine: &TriggerEngine,
+    trigger: TriggerQueueItem,
+) -> Result<(), WorkflowTriggerError> {
+    crate::telemetry::add_link_from_serialized_context(
+        &tracing::Span::current(),
+        trigger.span_context.as_deref(),
+    );
+
+    let span = tracing::Span::current();
+    span.record("trigger.id", trigger.id);
+    span.record("trigger.branch_id", trigger.branch_id);
+    span.record("trigger.new_hash", trigger.new_hash.as_str());
+    span.record("trigger.target_repo", trigger.target_repo.as_str());
+    span.record("trigger.event_type", trigger.event_type.as_str());
+    span.record(
+        "trigger.gh_app_installation_id",
+        trigger.gh_app_installation_id,
+    );
+    span.record("trigger.retry_count", trigger.retry_count);
+
     let dispatch_result = dispatch_events(engine, &trigger).await;
     match dispatch_result {
-        Ok(_) => {
-            TriggerRepository::delete_by_id(&*engine.ctx.repository, trigger.id).await?;
-        }
+        Ok(_) => delete_processed_trigger(engine, trigger.id).await,
         Err(WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)) => {
             warn!(
                 "Subscription for branch ID {} and target repo {} was not found (likely deleted). Deleting trigger task {} from queue.",
                 trigger.branch_id, trigger.target_repo, trigger.id
             );
-            TriggerRepository::delete_by_id(&*engine.ctx.repository, trigger.id).await?;
+            delete_processed_trigger(engine, trigger.id).await
         }
         Err(e) => {
+            let span = tracing::Span::current();
+            span.record("otel.status_code", "ERROR");
+            span.record("error.type", "dispatch_failed");
             warn!("Dispatch failed: {e}");
-            schedule_retry(engine, trigger, e).await?;
+            if let Err(retry_err) = schedule_retry(engine, trigger, e).await {
+                tracing::Span::current().record("error.type", "retry_scheduling_failed");
+                return Err(retry_err);
+            }
+            Ok(())
         }
     }
+}
 
+/// Deletes a processed trigger from the queue,
+/// marking the current span as failed if the deletion errors.
+async fn delete_processed_trigger(
+    engine: &TriggerEngine,
+    trigger_id: i64,
+) -> Result<(), WorkflowTriggerError> {
+    if let Err(e) = engine.ctx.repository.trigger_queue_delete(trigger_id).await {
+        tracing::Span::current().record("error.type", "queue_delete_failed");
+        return Err(e.into());
+    }
     Ok(())
 }
 
 /// Schedules the next retry for a trigger in the `trigger_queue`.
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "internal",
+        otel.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+    )
+)]
 async fn schedule_retry(
     engine: &TriggerEngine,
     trigger: TriggerQueueItem,
@@ -102,6 +181,9 @@ async fn schedule_retry(
         .as_secs();
 
     if next_retry_count as u32 >= max_attempts {
+        let span = tracing::Span::current();
+        span.record("otel.status_code", "ERROR");
+        span.record("error.type", "retries_exhausted");
         tracing::warn!(
             "Task {} failed after {} attempts: {e}",
             trigger.id,
@@ -112,7 +194,7 @@ async fn schedule_retry(
     engine
         .ctx
         .repository
-        .update_retry_status(UpdateRetryStatus {
+        .trigger_queue_update_retry_status(UpdateRetryStatus {
             id: trigger.id,
             retry_count: trigger.retry_count,
             max_attempts,
@@ -124,13 +206,15 @@ async fn schedule_retry(
 }
 
 /// Recovers tasks that have been stuck in `PROCESSING` for too long.
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 pub async fn recover_stuck_tasks(
     repo: &crate::repository::SqliteRepository,
     config: &crate::config::Config,
 ) -> Result<(), crate::repository::RepositoryError> {
     let threshold_seconds = config.engine.stuck_task_threshold.as_secs();
 
-    repo.recover_stuck_tasks(threshold_seconds).await?;
+    repo.trigger_queue_recover_stuck_tasks(threshold_seconds)
+        .await?;
     Ok(())
 }
 
@@ -138,6 +222,7 @@ pub async fn recover_stuck_tasks(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 pub async fn dispatch_events(
     engine: &TriggerEngine,
     trigger: &TriggerQueueItem,
@@ -145,7 +230,11 @@ pub async fn dispatch_events(
     let sub_with_branch = engine
         .ctx
         .repository
-        .get_by_keys_with_branch(trigger.branch_id, &trigger.target_repo, &trigger.event_type)
+        .subscriptions_get_by_keys_with_branch(
+            trigger.branch_id,
+            &trigger.target_repo,
+            &trigger.event_type,
+        )
         .await?
         .ok_or_else(|| {
             WorkflowTriggerError::Repository(crate::repository::RepositoryError::NotFound)
@@ -173,6 +262,7 @@ pub async fn dispatch_events(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
+#[tracing::instrument(skip_all, fields(otel.kind = "internal"))]
 async fn notify_subscription(
     engine: &TriggerEngine,
     iat: String,
@@ -187,6 +277,14 @@ async fn notify_subscription(
 ///
 /// <!-- LINKS -->
 /// [`Subscription`]: crate::model::Subscription
+#[tracing::instrument(
+    skip_all,
+    fields(
+        otel.kind = "client",
+        otel.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+    )
+)]
 async fn send_repository_dispatch(
     engine: &TriggerEngine,
     iat: &str,
@@ -249,6 +347,9 @@ async fn send_repository_dispatch(
         );
         Ok(())
     } else {
+        let span = tracing::Span::current();
+        span.record("otel.status_code", "ERROR");
+        span.record("error.type", response.status().as_u16().to_string());
         Err(WorkflowTriggerError::Api(RequestError::Response {
             status: response.status(),
             text: response.text().await?,
@@ -386,7 +487,7 @@ mod tests {
 
         let repo = crate::repository::SqliteRepository::new(pool.clone());
         let trigger = repo
-            .find_oldest_pending_and_mark_processing()
+            .trigger_queue_process_oldest_pending()
             .await
             .unwrap()
             .unwrap();
@@ -426,6 +527,7 @@ mod tests {
             target_repo: TargetRepo::new("org/repo".to_string()).unwrap(),
             event_type: EventType::new("event".to_string()).unwrap(),
             gh_app_installation_id: 1,
+            span_context: None,
         };
 
         let engine = TriggerEngine {

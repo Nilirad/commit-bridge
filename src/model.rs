@@ -14,7 +14,7 @@
 
 use crate::domain::{BranchName, CommitHash, EventType, RepoUrl, TargetRepo};
 use chrono::{DateTime, Utc};
-use rovo::schemars::JsonSchema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -222,4 +222,7 @@ pub struct TriggerQueueItem {
 
     /// Number of times the task has been attempted.
     pub retry_count: i64,
+
+    /// Serialized OpenTelemetry span context.
+    pub span_context: Option<String>,
 }

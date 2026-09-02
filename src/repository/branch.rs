@@ -8,23 +8,10 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait BranchRepository: Send + Sync {
     /// Returns all branches.
-    async fn get_all(&self) -> Result<Vec<Branch>, RepositoryError>;
-
-    /// Returns the branch with the given `id`.
-    async fn find_by_id(&self, id: i64) -> Result<Option<Branch>, RepositoryError>;
-
-    /// Deletes the branch with the given `id`.
-    async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
+    async fn branches_get_all(&self) -> Result<Vec<Branch>, RepositoryError>;
 
     /// Updates the last commit hash of the branch.
-    async fn update_last_commit_hash(
-        &self,
-        id: i64,
-        hash: &crate::domain::CommitHash,
-    ) -> Result<(), RepositoryError>;
-
-    /// Updates the last commit hash of the branch within a transaction.
-    async fn update_last_commit_hash_in_tx(
+    async fn branches_update_last_commit_hash(
         &self,
         id: i64,
         hash: &crate::domain::CommitHash,

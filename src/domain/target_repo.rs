@@ -1,7 +1,7 @@
 //! Domain type to represent a target repository hosted on GitHub.
 
 use crate::error::ValidationError;
-use rovo::schemars::JsonSchema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// The target GitHub repository in owner/repo format.

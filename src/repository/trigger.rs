@@ -20,31 +20,46 @@ pub struct UpdateRetryStatus {
     pub backoff_base_secs: u64,
 }
 
+/// Parameters for upserting trigger events for a branch.
+#[derive(Debug, Clone)]
+pub struct TriggerQueueUpsertParams<'a> {
+    /// The unique identifier of the branch.
+    pub branch_id: i64,
+
+    /// The new commit hash.
+    pub new_hash: &'a crate::domain::CommitHash,
+
+    /// Optional serialized OpenTelemetry span context.
+    pub span_context: Option<&'a str>,
+}
+
 /// Interface for `trigger_queue` table operations.
 #[async_trait]
 pub trait TriggerRepository: Send + Sync {
-    /// Returns all the trigger queue items.
-    async fn get_all(&self) -> Result<Vec<TriggerQueueItem>, RepositoryError>;
-
     /// Finds the oldest pending trigger queue item and marks it as processing in a transaction.
-    async fn find_oldest_pending_and_mark_processing(
+    async fn trigger_queue_process_oldest_pending(
         &self,
     ) -> Result<Option<TriggerQueueItem>, RepositoryError>;
 
     /// Schedules a retry or marks the trigger as failed if max attempts is reached.
-    async fn update_retry_status(&self, params: UpdateRetryStatus) -> Result<(), RepositoryError>;
+    async fn trigger_queue_update_retry_status(
+        &self,
+        params: UpdateRetryStatus,
+    ) -> Result<(), RepositoryError>;
 
     /// Recovers tasks that have been stuck in `PROCESSING` for too long.
-    async fn recover_stuck_tasks(&self, threshold_seconds: u64) -> Result<(), RepositoryError>;
+    async fn trigger_queue_recover_stuck_tasks(
+        &self,
+        threshold_seconds: u64,
+    ) -> Result<(), RepositoryError>;
 
     /// Deletes the trigger queue item with the given `id`.
-    async fn delete_by_id(&self, id: i64) -> Result<(), RepositoryError>;
+    async fn trigger_queue_delete(&self, id: i64) -> Result<(), RepositoryError>;
 
     /// Queues trigger events for all subscriptions of a branch.
-    async fn queue_triggers_for_branch(
+    async fn trigger_queue_upsert(
         &self,
-        branch_id: i64,
-        new_hash: &crate::domain::CommitHash,
+        params: TriggerQueueUpsertParams<'_>,
         executor: &mut sqlx::SqliteConnection,
     ) -> Result<(), RepositoryError>;
 }

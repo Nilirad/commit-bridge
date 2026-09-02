@@ -17,7 +17,7 @@ use axum::{
 };
 use rovo::rovo;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, instrument};
 
 /// Maps a [`SubscriptionWithBranch`] to its HAL representation.
 fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
@@ -56,6 +56,14 @@ fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(
+    otel.kind = "internal",
+    payload.source_repo_url = %payload.source_repo_url.as_str(),
+    payload.source_branch_name = %payload.source_branch_name.as_str(),
+    payload.target_repo = %payload.target_repo.as_str(),
+    payload.event_type = %payload.event_type.as_str(),
+    payload.gh_app_installation_id = %payload.gh_app_installation_id,
+))]
 pub async fn create_subscription(
     state: State<AppState>,
     payload: Json<CreateSubscription>,
@@ -68,7 +76,7 @@ async fn create_subscription_inner(
     State(state): State<AppState>,
     Json(payload): Json<CreateSubscription>,
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
-    let sub_with_branch = state.repository.create(&payload).await?;
+    let sub_with_branch = state.repository.subscriptions_create(&payload).await?;
 
     info!(
         "Registered new subscription for branch ID {} (repo: {}, branch: {}): {:?}",
@@ -82,7 +90,7 @@ async fn create_subscription_inner(
 }
 
 /// Query parameters for listing subscriptions.
-#[derive(Debug, Deserialize, rovo::schemars::JsonSchema)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ListSubscriptionsQuery {
     /// Maximum number of subscriptions to return.
     pub limit: Option<usize>,
@@ -111,6 +119,11 @@ pub struct ListSubscriptionsQuery {
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(
+    otel.kind = "internal",
+    query.limit = ?query.limit,
+    query.last_id = ?query.last_id,
+))]
 pub async fn list_subscriptions(
     state: State<AppState>,
     query: Query<ListSubscriptionsQuery>,
@@ -131,13 +144,16 @@ async fn list_subscriptions_inner(
 
     let subscriptions = state
         .repository
-        .list_paginated_with_branches(last_id, limit as i64)
+        .subscriptions_list_paginated(last_id, limit as i64)
         .await?;
 
     let data: Vec<SubscriptionHal> = subscriptions.into_iter().map(map_to_hal).collect();
 
     let next_id = data.last().map(|s| s.subscription.id).unwrap_or(last_id);
-    let remaining_count = state.repository.count_remaining(next_id).await?;
+    let remaining_count = state
+        .repository
+        .subscriptions_count_remaining(next_id)
+        .await?;
 
     let next_link = data
         .last()
@@ -177,6 +193,7 @@ async fn list_subscriptions_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(otel.kind = "internal", id = %id))]
 pub async fn get_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -191,7 +208,7 @@ async fn get_subscription_inner(
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
     let sub_with_branch = state
         .repository
-        .get_by_id_with_branch(id)
+        .subscriptions_get_by_id_with_branch(id)
         .await?
         .ok_or(HandlerError::NotFound)?;
     Ok(Json(map_to_hal(sub_with_branch)))
@@ -219,6 +236,13 @@ async fn get_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(
+    otel.kind = "internal",
+    id = %id,
+    payload.target_repo = ?payload.target_repo.as_ref().map(|v| v.as_str()),
+    payload.event_type = ?payload.event_type.as_ref().map(|v| v.as_str()),
+    payload.gh_app_installation_id = ?payload.gh_app_installation_id,
+))]
 pub async fn update_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -233,10 +257,10 @@ async fn update_subscription_inner(
     Path(id): Path<i64>,
     Json(payload): Json<UpdateSubscription>,
 ) -> Result<Json<SubscriptionHal>, HandlerError> {
-    state.repository.update(id, &payload).await?;
+    state.repository.subscriptions_update(id, &payload).await?;
     let sub_with_branch = state
         .repository
-        .get_by_id_with_branch(id)
+        .subscriptions_get_by_id_with_branch(id)
         .await?
         .ok_or(HandlerError::NotFound)?;
 
@@ -264,6 +288,7 @@ async fn update_subscription_inner(
 /// @tag subscriptions
 #[allow(rustdoc::invalid_html_tags)]
 #[rovo]
+#[instrument(skip_all, fields(otel.kind = "internal", id = %id))]
 pub async fn delete_subscription(
     state: State<AppState>,
     Path(id): Path<i64>,
@@ -276,7 +301,7 @@ async fn delete_subscription_inner(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<(), HandlerError> {
-    state.repository.delete_subscription_and_cascade(id).await?;
+    state.repository.subscriptions_delete(id).await?;
     Ok(())
 }
 

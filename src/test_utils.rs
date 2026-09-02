@@ -98,5 +98,8 @@ pub fn create_test_config() -> crate::config::Config {
         git: crate::config::GitConfig {
             repo_path: PathBuf::from("test-git-repo"),
         },
+        telemetry: crate::config::TelemetryConfig {
+            mark_client_errors_as_error: false,
+        },
     }
 }
