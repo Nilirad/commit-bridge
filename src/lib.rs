@@ -187,15 +187,10 @@ fn init_engines(ctx: &SharedContext, http_client: Client) -> Result<Vec<EngineTa
 }
 
 /// Middleware to authorize requests with an API key.
-#[tracing::instrument(
-    skip_all,
-    fields(
-        otel.kind = "internal",
-        uri = %req.uri(),
-        method = %req.method(),
-        authenticated = tracing::field::Empty
-    )
-)]
+///
+/// Records the `authenticated` attribute onto the `http.request` span
+/// (the span is current while this middleware runs,
+/// since it is layered below the `TraceLayer`).
 async fn auth_middleware(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -277,9 +272,7 @@ mod health_handler {
 ///
 /// The span is created within this crate
 /// (instead of using the default `tower_http` span factory)
-/// so that it is not filtered out by the default log filter
-/// (`RUST_LOG=commit_bridge=info`),
-/// which only enables targets within this crate.
+/// so that its attributes follow OpenTelemetry conventions.
 #[derive(Clone, Copy)]
 struct HttpRequestSpan;
 
@@ -294,6 +287,7 @@ impl<B> MakeSpan<B> for HttpRequestSpan {
             http.response.status_code = tracing::field::Empty,
             otel.status_code = tracing::field::Empty,
             error.type = tracing::field::Empty,
+            authenticated = tracing::field::Empty,
         )
     }
 }
