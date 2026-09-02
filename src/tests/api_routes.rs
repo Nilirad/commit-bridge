@@ -13,7 +13,7 @@ async fn test_subscription_api_routes() {
     config.auth.allow_unauthenticated = true;
     let repository = Arc::new(SqliteRepository::new(pool.clone()));
 
-    let app = build_router(repository, pool, &config);
+    let app = build_router(repository, &config);
 
     // Test List Subscriptions (Empty)
     let response = app

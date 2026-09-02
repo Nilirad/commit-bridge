@@ -69,7 +69,6 @@ mod tests {
         let state = AppState {
             config: std::sync::Arc::new(config),
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
         };
         let payload = CreateSubscription {
             source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),
@@ -147,7 +146,6 @@ mod tests {
         let state = AppState {
             config: std::sync::Arc::new(config),
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
         };
 
         // Try getting a non-existent subscription
@@ -176,7 +174,6 @@ mod tests {
         let state = AppState {
             config: std::sync::Arc::new(config),
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
         };
 
         // Create 3 subscriptions
@@ -234,7 +231,6 @@ mod tests {
         let state = AppState {
             config: std::sync::Arc::new(config),
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
         };
         let payload = CreateSubscription {
             source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),

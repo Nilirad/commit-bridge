@@ -261,7 +261,6 @@ mod tests {
         let ctx = SharedContext {
             config: crate::test_utils::create_test_config(),
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
             git_fetcher: mock_fetcher,
             token: CancellationToken::new(),
         };
@@ -314,7 +313,6 @@ mod tests {
         let ctx = SharedContext {
             config: crate::test_utils::create_test_config(),
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
             git_fetcher: Arc::new(crate::test_utils::MockGitFetcher {
                 hash: CommitHash::new("b".repeat(40)).unwrap(),
             }),
@@ -332,7 +330,6 @@ mod tests {
         let ctx = SharedContext {
             config: ctx.config,
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
             git_fetcher: mock_fetcher,
             token: ctx.token,
         };
@@ -402,7 +399,6 @@ mod tests {
         let ctx = SharedContext {
             config: crate::test_utils::create_test_config(),
             repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            db_pool: pool.clone(),
             git_fetcher: std::sync::Arc::new(crate::test_utils::MockGitFetcher {
                 hash: CommitHash::new("c".repeat(40)).unwrap(),
             }),

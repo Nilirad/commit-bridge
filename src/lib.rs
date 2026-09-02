@@ -10,7 +10,6 @@
 )]
 
 use std::fs;
-use std::str::FromStr;
 use std::time::Duration;
 
 use axum::{
@@ -26,7 +25,6 @@ use reqwest::Client;
 use rovo::Router as RovoRouter;
 use rovo::aide::openapi::OpenApi;
 use rovo::rovo;
-use sqlx::sqlite::SqliteConnectOptions;
 use subtle::ConstantTimeEq;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
@@ -74,16 +72,11 @@ type EngineTask = (Box<dyn AsyncEngine>, &'static str);
 /// Runs the server, delegating errors to the caller.
 pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result<(), FatalError> {
     let config = Config::load()?;
-    let pool = init_database(&config).await?;
-    let repository = std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone()));
+    let repository =
+        std::sync::Arc::new(crate::repository::SqliteRepository::connect(&config.database).await?);
     let http_client = build_http_client(&config)?;
 
-    let ctx = init_context(
-        repository.clone(),
-        pool.clone(),
-        config.clone(),
-        token.clone(),
-    )?;
+    let ctx = init_context(repository.clone(), config.clone(), token.clone())?;
 
     crate::trigger::recover_stuck_tasks(&repository, &config)
         .await
@@ -94,7 +87,7 @@ pub async fn run_app(tracker: &TaskTracker, token: &CancellationToken) -> Result
         crate::engine::start_engine(engine, message, tracker);
     }
 
-    let app = build_router(repository, pool, &config);
+    let app = build_router(repository, &config);
 
     run_server(app, &ctx.config, token.clone()).await?;
 
@@ -120,27 +113,9 @@ pub fn log_dotenv_status(loaded: bool) {
     );
 }
 
-/// Initializes the database pool.
-async fn init_database(config: &Config) -> Result<sqlx::SqlitePool, FatalError> {
-    let options = SqliteConnectOptions::from_str(config.database.url.as_str())?
-        .foreign_keys(true)
-        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
-
-    let pool = sqlx::sqlite::SqlitePoolOptions::new()
-        .acquire_timeout(config.database.timeout)
-        .connect_with(options)
-        .await?;
-
-    // Ensures database schema is up to date in all environments.
-    sqlx::migrate!().run(&pool).await?;
-
-    Ok(pool)
-}
-
 /// Initializes the shared application context.
 fn init_context(
     repository: std::sync::Arc<crate::repository::SqliteRepository>,
-    pool: sqlx::SqlitePool,
     config: Config,
     token: CancellationToken,
 ) -> Result<SharedContext, FatalError> {
@@ -156,7 +131,6 @@ fn init_context(
     Ok(SharedContext {
         config,
         repository,
-        db_pool: pool,
         token,
         git_fetcher: std::sync::Arc::new(git_fetcher),
     })
@@ -333,13 +307,11 @@ impl<B> OnResponse<B> for HttpRequestOnResponse {
 /// Builds the application router.
 pub fn build_router(
     repository: std::sync::Arc<crate::repository::SqliteRepository>,
-    pool: sqlx::SqlitePool,
     config: &Config,
 ) -> Router {
     let state = AppState {
         config: std::sync::Arc::new(config.clone()),
         repository,
-        db_pool: pool,
     };
 
     let mut api = OpenApi::default();

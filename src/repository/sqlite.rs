@@ -1,6 +1,10 @@
 //! SQLite implementation of the repository.
 
+use std::str::FromStr;
+
+use crate::config::DatabaseConfig;
 use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
+use crate::error::FatalError;
 use crate::model::{
     Branch, CreateSubscription, Subscription, SubscriptionWithBranch, TriggerQueueItem,
     UpdateSubscription,
@@ -13,6 +17,7 @@ use crate::repository::{
 };
 use async_trait::async_trait;
 use futures::future::BoxFuture;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{SqliteConnection, SqlitePool};
 
 #[derive(Debug)]
@@ -23,6 +28,23 @@ pub struct SqliteRepository {
 }
 
 impl SqliteRepository {
+    /// Connects to the database described by `config`.
+    pub async fn connect(config: &DatabaseConfig) -> Result<Self, FatalError> {
+        let options = SqliteConnectOptions::from_str(config.url.as_str())?
+            .foreign_keys(true)
+            .journal_mode(SqliteJournalMode::Wal);
+
+        let pool = SqlitePoolOptions::new()
+            .acquire_timeout(config.timeout)
+            .connect_with(options)
+            .await?;
+
+        // Ensures database schema is up to date in all environments.
+        sqlx::migrate!().run(&pool).await?;
+
+        Ok(Self { pool })
+    }
+
     /// Creates a new [`SqliteRepository`] from a [`SqlitePool`].
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
