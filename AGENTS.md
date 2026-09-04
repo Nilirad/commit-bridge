@@ -16,9 +16,13 @@ This file contains crucial context for AI agents working in this repository.
   5. Run `cargo sqlx prepare` again.
 
 ## Environment & Setup
-- **Nix First**: The project uses Nix flakes (`flake.nix`) and `direnv`. Agents should rely on `nix develop` to get the proper Rust toolchain, `sqlx-cli`, and wrapped `cargo` commands.
+- **Nix First**: The project uses Nix flakes (`flake.nix`) and `direnv`, and the Rust toolchain is only available inside the dev shell. In interactive shells, direnv loads it automatically; in non-interactive/automated shells the direnv hook does not run, so load the environment explicitly before any `cargo` invocation:
+
+  - Run `direnv allow` once if the `.envrc` is blocked.
+  - Run `eval "$(direnv export bash 2>/dev/null)"`, then verify with `command -v cargo` (should print a `/nix/store/...` path).
+  - If direnv is unavailable or cannot evaluate the envrc (e.g. restricted home access), fall back to `nix develop -c <command>`.
 - **Runtime Variables**: To run the server locally, you must ensure `CBRIDGE__AUTH__CLIENT_ID` and `CBRIDGE__AUTH__PEM_PATH` are set (pointing to a valid GitHub App private key).
-- **External Dependencies**: The application shells out to `git ls-remote` at runtime, so `git` must be available in the environment.
+- **External Dependencies**: Remote git operations are performed in-process via the `gix` crate; the application no longer shells out to `git ls-remote`, so an external `git` binary is not required at runtime.
 
 ## Architecture
 - **Frameworks**: `axum` for HTTP, `sqlx` (SQLite) for state, `tokio` for async execution.
