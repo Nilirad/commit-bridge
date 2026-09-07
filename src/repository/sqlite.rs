@@ -16,6 +16,7 @@ use crate::repository::{
     trigger::{TriggerRepository, UpdateRetryStatus},
 };
 use async_trait::async_trait;
+use chrono::NaiveDateTime;
 use futures::future::BoxFuture;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{SqliteConnection, SqlitePool};
@@ -94,6 +95,57 @@ impl BranchRepository for SqliteRepository {
     }
 }
 
+/// A row of the `subscriptions` table joined with its `branches` row.
+///
+/// Decoded by the `query_as!` macros in `subscriptions_get_*`;
+/// keep the fields in sync with those join projections.
+struct SubscriptionWithBranchRow {
+    /// Subscription primary key.
+    id: i64,
+    /// Foreign key to the `branches` table.
+    branch_id: i64,
+    /// Raw `target_repo` column.
+    target_repo: String,
+    /// Raw `event_type` column.
+    event_type: String,
+    /// GitHub App installation ID.
+    gh_app_installation_id: i64,
+    /// Creation timestamp.
+    created_at: NaiveDateTime,
+    /// Last-update timestamp.
+    updated_at: NaiveDateTime,
+    /// Repo URL of the source branch, from the join.
+    branch_repo_url: String,
+    /// Name of the source branch, from the join.
+    branch_name: String,
+}
+
+impl TryFrom<SubscriptionWithBranchRow> for SubscriptionWithBranch {
+    type Error = RepositoryError;
+
+    fn try_from(row: SubscriptionWithBranchRow) -> Result<Self, Self::Error> {
+        Ok(Self {
+            subscription: Subscription {
+                id: row.id,
+                branch_id: row.branch_id,
+                target_repo: TargetRepo::new(row.target_repo)
+                    .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                event_type: EventType::new(row.event_type)
+                    .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                gh_app_installation_id: row.gh_app_installation_id,
+                created_at: row.created_at.and_utc(),
+                updated_at: row.updated_at.and_utc(),
+            },
+            source_branch: crate::model::SourceBranchInfo {
+                repo_url: RepoUrl::new(row.branch_repo_url)
+                    .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+                name: BranchName::new(row.branch_name)
+                    .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
+            },
+        })
+    }
+}
+
 #[async_trait]
 impl SubscriptionRepository for SqliteRepository {
     #[tracing::instrument(skip_all, fields(otel.kind = "client"))]
@@ -144,7 +196,8 @@ impl SubscriptionRepository for SqliteRepository {
         &self,
         id: i64,
     ) -> Result<Option<SubscriptionWithBranch>, RepositoryError> {
-        let row = sqlx::query!(
+        let row = sqlx::query_as!(
+            SubscriptionWithBranchRow,
             "SELECT s.*, b.repo_url as branch_repo_url, b.name as branch_name \
              FROM subscriptions s \
              JOIN branches b ON s.branch_id = b.id \
@@ -155,28 +208,7 @@ impl SubscriptionRepository for SqliteRepository {
         .await
         .map_err(RepositoryError::Database)?;
 
-        match row {
-            Some(row) => Ok(Some(SubscriptionWithBranch {
-                subscription: Subscription {
-                    id: row.id,
-                    branch_id: row.branch_id,
-                    target_repo: crate::domain::TargetRepo::new(row.target_repo)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                    event_type: crate::domain::EventType::new(row.event_type)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                    gh_app_installation_id: row.gh_app_installation_id,
-                    created_at: row.created_at.and_utc(),
-                    updated_at: row.updated_at.and_utc(),
-                },
-                source_branch: crate::model::SourceBranchInfo {
-                    repo_url: crate::domain::RepoUrl::new(row.branch_repo_url)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                    name: crate::domain::BranchName::new(row.branch_name)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                },
-            })),
-            None => Ok(None),
-        }
+        row.map(SubscriptionWithBranch::try_from).transpose()
     }
 
     #[tracing::instrument(
@@ -194,7 +226,8 @@ impl SubscriptionRepository for SqliteRepository {
         target_repo: &TargetRepo,
         event_type: &EventType,
     ) -> Result<Option<SubscriptionWithBranch>, RepositoryError> {
-        let row = sqlx::query!(
+        let row = sqlx::query_as!(
+            SubscriptionWithBranchRow,
             "SELECT s.*, b.repo_url as branch_repo_url, b.name as branch_name \
              FROM subscriptions s \
              JOIN branches b ON s.branch_id = b.id \
@@ -207,28 +240,7 @@ impl SubscriptionRepository for SqliteRepository {
         .await
         .map_err(RepositoryError::Database)?;
 
-        match row {
-            Some(row) => Ok(Some(SubscriptionWithBranch {
-                subscription: Subscription {
-                    id: row.id,
-                    branch_id: row.branch_id,
-                    target_repo: crate::domain::TargetRepo::new(row.target_repo)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                    event_type: crate::domain::EventType::new(row.event_type)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                    gh_app_installation_id: row.gh_app_installation_id,
-                    created_at: row.created_at.and_utc(),
-                    updated_at: row.updated_at.and_utc(),
-                },
-                source_branch: crate::model::SourceBranchInfo {
-                    repo_url: crate::domain::RepoUrl::new(row.branch_repo_url)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                    name: crate::domain::BranchName::new(row.branch_name)
-                        .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                },
-            })),
-            None => Ok(None),
-        }
+        row.map(SubscriptionWithBranch::try_from).transpose()
     }
 
     #[tracing::instrument(
@@ -240,7 +252,8 @@ impl SubscriptionRepository for SqliteRepository {
         last_id: i64,
         limit: i64,
     ) -> Result<Vec<SubscriptionWithBranch>, RepositoryError> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query_as!(
+            SubscriptionWithBranchRow,
             "SELECT s.*, b.repo_url as branch_repo_url, b.name as branch_name \
              FROM subscriptions s \
              JOIN branches b ON s.branch_id = b.id \
@@ -252,31 +265,9 @@ impl SubscriptionRepository for SqliteRepository {
         .await
         .map_err(RepositoryError::Database)?;
 
-        let subscriptions: Result<Vec<SubscriptionWithBranch>, RepositoryError> = rows
-            .into_iter()
-            .map(|row| {
-                Ok(SubscriptionWithBranch {
-                    subscription: Subscription {
-                        id: row.id,
-                        branch_id: row.branch_id,
-                        target_repo: TargetRepo::new(row.target_repo)
-                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                        event_type: EventType::new(row.event_type)
-                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                        gh_app_installation_id: row.gh_app_installation_id,
-                        created_at: row.created_at.and_utc(),
-                        updated_at: row.updated_at.and_utc(),
-                    },
-                    source_branch: crate::model::SourceBranchInfo {
-                        repo_url: RepoUrl::new(row.branch_repo_url)
-                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                        name: BranchName::new(row.branch_name)
-                            .map_err(|e| RepositoryError::Mapping(e.to_string()))?,
-                    },
-                })
-            })
-            .collect();
-        subscriptions
+        rows.into_iter()
+            .map(SubscriptionWithBranch::try_from)
+            .collect::<Result<Vec<_>, _>>()
     }
 
     #[tracing::instrument(skip_all, fields(otel.kind = "client", last_id = %last_id))]
