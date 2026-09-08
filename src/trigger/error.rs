@@ -31,10 +31,6 @@ impl From<reqwest::Error> for WorkflowTriggerError {
 /// Authentication errors.
 #[derive(Debug, Error)]
 pub enum AuthError {
-    /// Failed to read PEM file.
-    #[error("Could not read PEM file: {0}")]
-    PemFile(#[from] std::io::Error),
-
     /// An error with time APIs.
     #[error("System time: {0}")]
     Time(#[from] std::time::SystemTimeError),
