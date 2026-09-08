@@ -6,15 +6,22 @@
     clippy::indexing_slicing
 )]
 
-use crate::{
-    domain::{AcceptHeader, ApiVersion, CommitHash, NonEmptyString},
-    polling::git::GitFetcher,
-    trigger::{Authenticator, error::AuthError},
-};
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
-use std::path::PathBuf;
+use tokio_util::sync::CancellationToken;
 use url::Url;
+
+use crate::{
+    context::SharedContext,
+    domain::{AcceptHeader, ApiVersion, CommitHash, NonEmptyString},
+    http::state::AppState,
+    polling::git::GitFetcher,
+    repository::SqliteRepository,
+    trigger::{Authenticator, TriggerEngine, error::AuthError},
+};
 
 pub struct MockGitFetcher {
     pub hash: CommitHash,
@@ -101,5 +108,37 @@ pub fn create_test_config() -> crate::config::Config {
         telemetry: crate::config::TelemetryConfig {
             mark_client_errors_as_error: false,
         },
+    }
+}
+
+/// Creates an [`AppState`] with the default test configuration,
+/// backed by `pool`.
+pub fn create_test_state(pool: SqlitePool) -> AppState {
+    AppState {
+        config: Arc::new(create_test_config()),
+        repository: Arc::new(SqliteRepository::new(pool)),
+    }
+}
+
+/// Creates a [`SharedContext`] backed by `pool`,
+/// whose git fetcher always reports `hash`.
+pub fn create_test_context(pool: SqlitePool, hash: CommitHash) -> SharedContext {
+    SharedContext {
+        config: create_test_config(),
+        repository: Arc::new(SqliteRepository::new(pool)),
+        token: CancellationToken::new(),
+        git_fetcher: Arc::new(MockGitFetcher { hash }),
+    }
+}
+
+/// Creates a [`TriggerEngine`] with the default test mocks,
+/// backed by `pool`.
+pub fn create_test_engine(pool: SqlitePool) -> TriggerEngine {
+    TriggerEngine {
+        ctx: create_test_context(pool, CommitHash::new("a".repeat(40)).expect("valid hash")),
+        http_client: reqwest::Client::new(),
+        authenticator: Box::new(MockAuthenticator {
+            iat: "token".to_string(),
+        }),
     }
 }

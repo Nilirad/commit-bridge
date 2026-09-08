@@ -34,20 +34,15 @@ mod tests {
     use super::update::update_subscription_inner;
     use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
     use crate::http::error::HandlerError;
-    use crate::http::state::AppState;
     use crate::model::{CreateSubscription, UpdateSubscription};
-    use crate::test_utils::create_test_db;
+    use crate::test_utils::{create_test_db, create_test_state};
     use axum::Json;
     use axum::extract::{Path, Query, State};
 
     #[tokio::test]
     async fn test_crud_subscription() {
         let pool = create_test_db().await;
-        let config = crate::test_utils::create_test_config();
-        let state = AppState {
-            config: std::sync::Arc::new(config),
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-        };
+        let state = create_test_state(pool.clone());
         let payload = CreateSubscription {
             source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),
             source_branch_name: BranchName::new("main".to_string()).unwrap(),
@@ -120,11 +115,7 @@ mod tests {
     #[tokio::test]
     async fn test_non_existent_subscription_returns_not_found() {
         let pool = create_test_db().await;
-        let config = crate::test_utils::create_test_config();
-        let state = AppState {
-            config: std::sync::Arc::new(config),
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-        };
+        let state = create_test_state(pool.clone());
 
         // Try getting a non-existent subscription
         let get_res = get_subscription_inner(State(state.clone()), Path(999)).await;
@@ -148,11 +139,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_subscriptions_pagination() {
         let pool = create_test_db().await;
-        let config = crate::test_utils::create_test_config();
-        let state = AppState {
-            config: std::sync::Arc::new(config),
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-        };
+        let state = create_test_state(pool.clone());
 
         // Create 3 subscriptions
         //
@@ -205,11 +192,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascading_branch_cleanup() {
         let pool = create_test_db().await;
-        let config = crate::test_utils::create_test_config();
-        let state = AppState {
-            config: std::sync::Arc::new(config),
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-        };
+        let state = create_test_state(pool.clone());
         let payload = CreateSubscription {
             source_repo_url: RepoUrl::new("https://github.com/org/repo".to_string()).unwrap(),
             source_branch_name: BranchName::new("main".to_string()).unwrap(),
