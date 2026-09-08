@@ -17,28 +17,6 @@ pub use get::get_subscription;
 pub use list::list_subscriptions;
 pub use update::update_subscription;
 
-use crate::model::{HalLink, SubscriptionHal, SubscriptionLinks, SubscriptionWithBranch};
-
-/// Maps a [`SubscriptionWithBranch`] to its HAL representation.
-fn map_to_hal(sub_with_branch: SubscriptionWithBranch) -> SubscriptionHal {
-    let id = sub_with_branch.subscription.id;
-    SubscriptionHal {
-        subscription: sub_with_branch.subscription,
-        source_branch: sub_with_branch.source_branch,
-        links: SubscriptionLinks {
-            self_link: HalLink {
-                href: format!("/subscriptions/{}", id),
-            },
-            update: HalLink {
-                href: format!("/subscriptions/{}", id),
-            },
-            delete: HalLink {
-                href: format!("/subscriptions/{}", id),
-            },
-        },
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(

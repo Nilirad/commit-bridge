@@ -1,9 +1,8 @@
 //! Get a single subscription handler.
 
-use super::map_to_hal;
 use crate::http::error::HandlerError;
+use crate::http::hal::{SubscriptionHal, map_to_hal};
 use crate::http::state::AppState;
-use crate::model::SubscriptionHal;
 use crate::repository::subscription::SubscriptionRepository;
 use axum::{
     Json,

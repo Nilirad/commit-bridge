@@ -1,9 +1,10 @@
 //! List subscriptions handler.
 
-use super::map_to_hal;
 use crate::http::error::HandlerError;
+use crate::http::hal::{
+    HalLink, SubscriptionHal, SubscriptionPage, SubscriptionPageLinks, map_to_hal,
+};
 use crate::http::state::AppState;
-use crate::model::{HalLink, SubscriptionHal, SubscriptionPage, SubscriptionPageLinks};
 use crate::repository::subscription::SubscriptionRepository;
 use axum::{
     Json,
