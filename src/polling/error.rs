@@ -73,26 +73,9 @@ pub enum CommitHashError {
     #[error("Validation error: {0}")]
     Validation(#[from] ValidationError),
 
-    /// I/O error.
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-
     /// Unexpected failure while fetching the commit hash.
     #[error("Unexpected failure while fetching the commit hash: {0}")]
     UnexpectedStatus(String),
-
-    /// Unexpected output while fetching the commit hash.
-    #[error(
-        "Unexpected output while fetching the commit hash. Repo: {repo_url}; Branch: {branch}; Output: {stdout}"
-    )]
-    UnexpectedOutput {
-        /// The unexpected output text.
-        stdout: String,
-        /// The relevant git repository URL.
-        repo_url: String,
-        /// The relevant git branch.
-        branch: String,
-    },
 
     /// Failed to find remote.
     #[error("Failed to find remote: {0}")]

@@ -30,13 +30,13 @@ and the repositories that need those dependencies.
 This project uses
 [`axum`] to handle incoming requests,
 [`reqwest`] to send requests to the GitHub API,
-[`git ls-remote`] to check the last commit on a remote branch,
+[`gix`] to check the latest commit on remote branches,
 and [`sqlx`] connected to a SQLite database to hold state.
 
 <!-- LINKS -->
 [`axum`]: https://docs.rs/axum/latest/axum/
 [`reqwest`]: https://docs.rs/reqwest/latest/reqwest/
-[`git ls-remote`]: https://git-scm.com/docs/git-ls-remote
+[`gix`]: https://docs.rs/gix/latest/gix/
 [`sqlx`]: https://docs.rs/sqlx/latest/sqlx/
 
 ## Usage
