@@ -1,6 +1,7 @@
 //! HTTP networking: router wiring, server runtime, and the outbound HTTP client.
 
 pub mod error;
+pub mod hal;
 pub mod handler;
 pub mod router;
 pub(crate) mod server;

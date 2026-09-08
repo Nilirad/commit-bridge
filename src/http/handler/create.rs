@@ -1,9 +1,9 @@
 //! Create a new subscription handler.
 
-use super::map_to_hal;
 use crate::http::error::HandlerError;
+use crate::http::hal::{SubscriptionHal, map_to_hal};
 use crate::http::state::AppState;
-use crate::model::{CreateSubscription, SubscriptionHal};
+use crate::model::CreateSubscription;
 use crate::repository::subscription::SubscriptionRepository;
 use axum::{Json, extract::State};
 use rovo::rovo;

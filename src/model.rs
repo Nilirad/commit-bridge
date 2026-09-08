@@ -3,15 +3,6 @@
 //! The `Create_` `struct`s represent the payload
 //! to create the corresponding row.
 
-// FIXME: Some docstrings have been duplicated.
-// Maybe this problem can be solved by including an external Markdown file.
-// For example:
-//
-// ```rust
-// #[doc = include_str!("docs/my_struct.md")]
-// pub struct MyStruct { ... }
-// ```
-
 use crate::domain::{BranchName, CommitHash, EventType, RepoUrl, TargetRepo};
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
@@ -84,44 +75,6 @@ pub struct SourceBranchInfo {
     pub name: BranchName,
 }
 
-/// HAL links for a subscription page.
-#[derive(Serialize, JsonSchema)]
-pub struct SubscriptionPageLinks {
-    /// Next page link.
-    pub next: Option<HalLink>,
-}
-
-/// Paginated representation of subscriptions.
-#[derive(Serialize, JsonSchema)]
-pub struct SubscriptionPage {
-    /// The subscription data.
-    pub data: Vec<SubscriptionHal>,
-    /// Number of elements remaining after this page.
-    pub remaining_count: i64,
-    /// HAL links.
-    #[serde(rename = "_links")]
-    pub links: SubscriptionPageLinks,
-}
-
-/// HAL link structure.
-#[derive(Serialize, JsonSchema)]
-pub struct HalLink {
-    /// URL of the link.
-    pub href: String,
-}
-
-/// HAL links for a subscription.
-#[derive(Serialize, JsonSchema)]
-pub struct SubscriptionLinks {
-    /// Self link.
-    #[serde(rename = "self")]
-    pub self_link: HalLink,
-    /// Update link.
-    pub update: HalLink,
-    /// Delete link.
-    pub delete: HalLink,
-}
-
 /// Combined subscription and branch information.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct SubscriptionWithBranch {
@@ -130,19 +83,6 @@ pub struct SubscriptionWithBranch {
     pub subscription: Subscription,
     /// The source branch info.
     pub source_branch: SourceBranchInfo,
-}
-
-/// HAL representation of a subscription.
-#[derive(Serialize, JsonSchema)]
-pub struct SubscriptionHal {
-    /// The subscription data.
-    #[serde(flatten)]
-    pub subscription: Subscription,
-    /// The source repository and branch.
-    pub source_branch: SourceBranchInfo,
-    /// HAL links.
-    #[serde(rename = "_links")]
-    pub links: SubscriptionLinks,
 }
 
 /// Holds payload data for the creation of a [`Subscription`].
@@ -157,18 +97,10 @@ pub struct CreateSubscription {
     /// The repository whose workflow needs to be triggered.
     pub target_repo: TargetRepo,
 
-    /// Identifies the specific [`repository_dispatch`] event.
-    ///
-    /// The values must contain at most 100 characters.
-    ///
-    /// <!-- LINKS -->
-    /// [`repository_dispatch`]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch
+    /// The `repository_dispatch` event type (at most 100 characters).
     pub event_type: EventType,
 
-    /// Allows authenticating as a [GitHub App installation][gh_app_auth].
-    ///
-    /// <!-- LINKS -->
-    /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
+    /// The GitHub App installation used to authenticate the dispatch.
     pub gh_app_installation_id: i64,
 }
 
@@ -178,18 +110,10 @@ pub struct UpdateSubscription {
     /// The repository whose workflow needs to be triggered.
     pub target_repo: Option<TargetRepo>,
 
-    /// Identifies the specific [`repository_dispatch`] event.
-    ///
-    /// The values must contain at most 100 characters.
-    ///
-    /// <!-- LINKS -->
-    /// [`repository_dispatch`]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch
+    /// The `repository_dispatch` event type (at most 100 characters).
     pub event_type: Option<EventType>,
 
-    /// Allows authenticating as a [GitHub App installation][gh_app_auth].
-    ///
-    /// <!-- LINKS -->
-    /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
+    /// The GitHub App installation used to authenticate the dispatch.
     pub gh_app_installation_id: Option<i64>,
 }
 
@@ -208,16 +132,10 @@ pub struct TriggerQueueItem {
     /// The repository whose workflow needs to be triggered.
     pub target_repo: TargetRepo,
 
-    /// Identifies the specific [`repository_dispatch`] event.
-    ///
-    /// <!-- LINKS -->
-    /// [`repository_dispatch`]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch
+    /// The `repository_dispatch` event type (at most 100 characters).
     pub event_type: EventType,
 
-    /// Allows authenticating as a [GitHub App installation][gh_app_auth].
-    ///
-    /// <!-- LINKS -->
-    /// [gh_app_auth]: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation
+    /// The GitHub App installation used to authenticate the dispatch.
     pub gh_app_installation_id: i64,
 
     /// Number of times the task has been attempted.
