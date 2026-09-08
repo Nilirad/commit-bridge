@@ -222,12 +222,9 @@ async fn followup_poll(res: Result<(), PollingError>, ctx: &SharedContext) {
     clippy::indexing_slicing
 )]
 mod tests {
-    use crate::context::SharedContext;
     use crate::domain::CommitHash;
     use crate::polling::poll_branches;
-    use crate::test_utils::MockGitFetcher;
-    use std::sync::Arc;
-    use tokio_util::sync::CancellationToken;
+    use crate::test_utils::create_test_context;
 
     #[tokio::test]
     async fn test_poll_branches_updates_db_and_queues_trigger() {
@@ -255,16 +252,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mock_fetcher = Arc::new(MockGitFetcher {
-            hash: CommitHash::new("b".repeat(40)).unwrap(),
-        });
-
-        let ctx = SharedContext {
-            config: crate::test_utils::create_test_config(),
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            git_fetcher: mock_fetcher,
-            token: CancellationToken::new(),
-        };
+        let ctx = create_test_context(pool.clone(), CommitHash::new("b".repeat(40)).unwrap());
 
         poll_branches(&ctx).await.unwrap();
 
@@ -311,29 +299,14 @@ mod tests {
             .await
             .unwrap();
 
-        let ctx = SharedContext {
-            config: crate::test_utils::create_test_config(),
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            git_fetcher: Arc::new(crate::test_utils::MockGitFetcher {
-                hash: CommitHash::new("b".repeat(40)).unwrap(),
-            }),
-            token: CancellationToken::new(),
-        };
+        let ctx = create_test_context(pool.clone(), CommitHash::new("b".repeat(40)).unwrap());
 
         // First update
         poll_branches(&ctx).await.unwrap();
 
         // Second update (coalescing)
         // Manually update the mock fetcher to a new hash
-        let mock_fetcher = Arc::new(crate::test_utils::MockGitFetcher {
-            hash: CommitHash::new("c".repeat(40)).unwrap(),
-        });
-        let ctx = SharedContext {
-            config: ctx.config,
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            git_fetcher: mock_fetcher,
-            token: ctx.token,
-        };
+        let ctx = create_test_context(pool.clone(), CommitHash::new("c".repeat(40)).unwrap());
         poll_branches(&ctx).await.unwrap();
 
         // Verify only one entry in queue
@@ -397,14 +370,7 @@ mod tests {
             .await
             .unwrap();
 
-        let ctx = SharedContext {
-            config: crate::test_utils::create_test_config(),
-            repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(pool.clone())),
-            git_fetcher: std::sync::Arc::new(crate::test_utils::MockGitFetcher {
-                hash: CommitHash::new("c".repeat(40)).unwrap(),
-            }),
-            token: tokio_util::sync::CancellationToken::new(),
-        };
+        let ctx = create_test_context(pool.clone(), CommitHash::new("c".repeat(40)).unwrap());
 
         // Poll for both branches. The first branch updates to 'c'
         // The second branch updates to 'c' and coalesces with the first one

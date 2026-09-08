@@ -168,16 +168,11 @@ mod tests {
 
     use super::recover_stuck_tasks;
     use super::schedule_retry;
-    use crate::context::SharedContext;
     use crate::domain::{CommitHash, EventType, TargetRepo};
     use crate::model::TriggerQueueItem;
     use crate::repository::trigger::TriggerRepository;
-    use crate::test_utils::{MockAuthenticator, MockGitFetcher};
     use crate::trigger::error::{RequestError, WorkflowTriggerError};
-    use crate::trigger::{TriggerEngine, process_queue};
-    use std::sync::Arc;
-
-    use tokio_util::sync::CancellationToken;
+    use crate::trigger::process_queue;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -335,22 +330,7 @@ mod tests {
             span_context: None,
         };
 
-        let engine = TriggerEngine {
-            ctx: SharedContext {
-                config: crate::test_utils::create_test_config(),
-                repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(
-                    pool.clone(),
-                )),
-                token: CancellationToken::new(),
-                git_fetcher: Arc::new(MockGitFetcher {
-                    hash: CommitHash::new("a".repeat(40)).unwrap(),
-                }),
-            },
-            http_client: reqwest::Client::new(),
-            authenticator: Box::new(MockAuthenticator {
-                iat: "token".to_string(),
-            }),
-        };
+        let engine = crate::test_utils::create_test_engine(pool.clone());
 
         schedule_retry(
             &engine,
@@ -421,22 +401,7 @@ mod tests {
         .await
         .unwrap();
 
-        let engine = TriggerEngine {
-            ctx: SharedContext {
-                config: crate::test_utils::create_test_config(),
-                repository: std::sync::Arc::new(crate::repository::SqliteRepository::new(
-                    pool.clone(),
-                )),
-                token: CancellationToken::new(),
-                git_fetcher: Arc::new(MockGitFetcher {
-                    hash: CommitHash::new("a".repeat(40)).unwrap(),
-                }),
-            },
-            http_client: reqwest::Client::new(),
-            authenticator: Box::new(MockAuthenticator {
-                iat: "token".to_string(),
-            }),
-        };
+        let engine = crate::test_utils::create_test_engine(pool.clone());
 
         process_queue(&engine).await.unwrap();
 
