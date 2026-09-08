@@ -1,6 +1,6 @@
 //! Domain type to represent a git commit hash.
 
-use crate::error::ValidationError;
+use crate::domain::ValidationError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

@@ -8,6 +8,7 @@ pub mod event_type;
 pub mod non_empty_string;
 pub mod repo_url;
 pub mod target_repo;
+pub mod validation_error;
 
 pub use accept_header::AcceptHeader;
 pub use api_version::ApiVersion;
@@ -17,6 +18,7 @@ pub use event_type::EventType;
 pub use non_empty_string::NonEmptyString;
 pub use repo_url::RepoUrl;
 pub use target_repo::TargetRepo;
+pub use validation_error::ValidationError;
 
 /// Derives `sqlx` trait implementations for a type that implements `TryFrom<String>`.
 ///

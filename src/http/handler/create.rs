@@ -1,7 +1,7 @@
 //! Create a new subscription handler.
 
 use super::map_to_hal;
-use crate::error::HandlerError;
+use crate::http::error::HandlerError;
 use crate::http::state::AppState;
 use crate::model::{CreateSubscription, SubscriptionHal};
 use crate::repository::subscription::SubscriptionRepository;

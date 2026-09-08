@@ -29,7 +29,7 @@ This file contains crucial context for AI agents working in this repository.
 - **Execution Flow**: `src/main.rs` initializes an `axum` router and spawns two decoupled background `tokio` tasks:
   1. `polling/`: Periodically checks remote git repositories for updates.
   2. `trigger/`: Receives update events from the polling engine via `mpsc` channels and triggers GitHub Action workflows on target repositories.
-- **Error Handling**: Use domain-specific error enums (`HandlerError`, `FatalError`) defined in `src/error.rs` using the `thiserror` crate. Ensure `IntoResponse` is implemented for any errors that bubble up to Axum handlers.
+- **Error Handling**: Use `thiserror` for domain-specific error enums, defined in the layer they belong to: `HandlerError` in `src/http/error.rs`, repository errors in `src/repository/error.rs`, engine errors in `src/{polling,trigger}/error.rs`, and value-validation errors in `src/domain/`. Boot-time errors (`FatalError`, `SetupError`) live in `src/error.rs`. Implement `IntoResponse` for any error that bubbles up to an Axum handler.
 
 ## Reviews
 

@@ -55,7 +55,7 @@ mod tests {
     use super::list::{ListSubscriptionsQuery, list_subscriptions_inner};
     use super::update::update_subscription_inner;
     use crate::domain::{BranchName, EventType, RepoUrl, TargetRepo};
-    use crate::error::HandlerError;
+    use crate::http::error::HandlerError;
     use crate::http::state::AppState;
     use crate::model::{CreateSubscription, UpdateSubscription};
     use crate::test_utils::create_test_db;

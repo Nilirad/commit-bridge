@@ -1,6 +1,6 @@
 //! Domain type to represent an HTTP Accept header.
 
-use crate::error::ValidationError;
+use crate::domain::ValidationError;
 use http::header::HeaderValue;
 use serde::{Deserialize, Serialize};
 
