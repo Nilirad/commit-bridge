@@ -166,7 +166,7 @@ impl<B> OnResponse<B> for HttpRequestOnResponse {
     fn on_response(self, response: &Response<B>, _latency: Duration, span: &Span) {
         span.record("http.response.status_code", response.status().as_u16());
         if self.should_mark_error(response.status()) {
-            span.record("otel.status_code", "ERROR");
+            crate::telemetry::record_span_error(span);
             span.record("error.type", response.status().as_u16().to_string());
         }
     }

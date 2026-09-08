@@ -31,7 +31,7 @@ pub(super) async fn process_trigger(
 ) -> Result<(), WorkflowTriggerError> {
     let result = process_trigger_inner(engine, trigger).await;
     if result.is_err() {
-        tracing::Span::current().record("otel.status_code", "ERROR");
+        crate::telemetry::mark_current_span_error();
     }
     result
 }
@@ -70,7 +70,7 @@ async fn process_trigger_inner(
         }
         Err(e) => {
             let span = tracing::Span::current();
-            span.record("otel.status_code", "ERROR");
+            crate::telemetry::record_span_error(&span);
             span.record("error.type", "dispatch_failed");
             warn!("Dispatch failed: {e}");
             if let Err(retry_err) = schedule_retry(engine, trigger, e).await {
@@ -120,7 +120,7 @@ async fn schedule_retry(
 
     if next_retry_count as u32 >= max_attempts {
         let span = tracing::Span::current();
-        span.record("otel.status_code", "ERROR");
+        crate::telemetry::record_span_error(&span);
         span.record("error.type", "retries_exhausted");
         tracing::warn!(
             "Task {} failed after {} attempts: {e}",

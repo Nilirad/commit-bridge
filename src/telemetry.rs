@@ -95,6 +95,22 @@ pub fn serialize_current_span_context() -> Option<String> {
         .ok()
 }
 
+/// Records the OpenTelemetry `ERROR` status on `span`.
+///
+/// Only effective if `span` declares the `otel.status_code` field
+/// (e.g. through `#[tracing::instrument]`); otherwise the record is dropped.
+pub(crate) fn record_span_error(span: &tracing::Span) {
+    span.record("otel.status_code", "ERROR");
+}
+
+/// Records the OpenTelemetry `ERROR` status on the current span.
+///
+/// Only effective if the current span declares the `otel.status_code` field
+/// (e.g. through `#[tracing::instrument]`); otherwise the record is dropped.
+pub(crate) fn mark_current_span_error() {
+    record_span_error(&tracing::Span::current());
+}
+
 /// Adds a span link to the given tracing span
 /// from a serialized OpenTelemetry span context string, if valid.
 pub fn add_link_from_serialized_context(span: &tracing::Span, span_context: Option<&str>) {

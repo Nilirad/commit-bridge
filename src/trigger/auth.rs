@@ -9,7 +9,10 @@ use tracing::info;
 use crate::{
     config::Config,
     model::Subscription,
-    trigger::error::{AuthError, RequestError},
+    trigger::{
+        error::{AuthError, RequestError},
+        github::{apply_api_headers, endpoint},
+    },
 };
 
 /// Provides authentication functionality.
@@ -111,21 +114,19 @@ pub(super) async fn request_iat(
         token: String,
     }
 
-    let api_url = format!(
-        "{}/app/installations/{}/access_tokens",
-        config.github_api.base_url.as_str().trim_end_matches('/'),
-        sub.gh_app_installation_id
+    let api_url = endpoint(
+        &config.github_api,
+        &format!(
+            "/app/installations/{}/access_tokens",
+            sub.gh_app_installation_id
+        ),
     );
-    let response = http_client
-        .post(&api_url)
-        .bearer_auth(jwt)
-        .header("Accept", config.github_api.accept_header.to_string())
-        .header(
-            "X-GitHub-Api-Version",
-            config.github_api.version.to_string(),
-        )
-        .send()
-        .await?;
+    let response = apply_api_headers(
+        &config.github_api,
+        http_client.post(&api_url).bearer_auth(jwt),
+    )
+    .send()
+    .await?;
 
     if response.status().is_success() {
         let response_json = response.json::<IatResponse>().await?;

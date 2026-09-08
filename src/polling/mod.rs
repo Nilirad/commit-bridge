@@ -78,7 +78,7 @@ async fn process_branch_updates(
 ) -> Result<(), PollingError> {
     let result = process_branch_updates_inner(ctx, updated_branches).await;
     if result.is_err() {
-        tracing::Span::current().record("otel.status_code", "ERROR");
+        crate::telemetry::mark_current_span_error();
     }
     result
 }
@@ -172,7 +172,7 @@ async fn process_single_branch(
 ) -> Result<(), RepositoryError> {
     let result = process_single_branch_inner(repo, branch_info, tx).await;
     if result.is_err() {
-        tracing::Span::current().record("otel.status_code", "ERROR");
+        crate::telemetry::mark_current_span_error();
     }
     result
 }

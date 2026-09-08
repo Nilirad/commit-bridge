@@ -8,6 +8,7 @@ use crate::{
     trigger::{
         TriggerEngine,
         error::{RequestError, WorkflowTriggerError},
+        github::{apply_api_headers, endpoint},
     },
 };
 
@@ -84,16 +85,12 @@ async fn send_repository_dispatch(
     trigger: &TriggerQueueItem,
     sub_with_branch: &SubscriptionWithBranch,
 ) -> Result<(), WorkflowTriggerError> {
-    let api_url = format!(
-        "{}/repos/{}/dispatches",
-        engine
-            .ctx
-            .config
-            .github_api
-            .base_url
-            .as_str()
-            .trim_end_matches('/'),
-        sub_with_branch.subscription.target_repo
+    let api_url = endpoint(
+        &engine.ctx.config.github_api,
+        &format!(
+            "/repos/{}/dispatches",
+            sub_with_branch.subscription.target_repo
+        ),
     );
 
     let payload = serde_json::json!({
@@ -114,21 +111,13 @@ async fn send_repository_dispatch(
         payload
     );
 
-    let response = engine
-        .http_client
-        .post(&api_url)
-        .bearer_auth(iat)
-        .header(
-            "Accept",
-            engine.ctx.config.github_api.accept_header.to_string(),
-        )
-        .header(
-            "X-GitHub-Api-Version",
-            engine.ctx.config.github_api.version.to_string(),
-        )
-        .json(&payload)
-        .send()
-        .await?;
+    let response = apply_api_headers(
+        &engine.ctx.config.github_api,
+        engine.http_client.post(&api_url).bearer_auth(iat),
+    )
+    .json(&payload)
+    .send()
+    .await?;
 
     if response.status().is_success() {
         info!(
@@ -141,7 +130,7 @@ async fn send_repository_dispatch(
         Ok(())
     } else {
         let span = tracing::Span::current();
-        span.record("otel.status_code", "ERROR");
+        crate::telemetry::record_span_error(&span);
         span.record("error.type", response.status().as_u16().to_string());
         Err(WorkflowTriggerError::Api(RequestError::Response {
             status: response.status(),

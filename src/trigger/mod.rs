@@ -14,6 +14,7 @@ use crate::{
 mod auth;
 mod dispatch;
 pub mod error;
+mod github;
 mod process;
 
 pub use auth::{Authenticator, GitHubAuthenticator};
