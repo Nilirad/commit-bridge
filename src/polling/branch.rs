@@ -1,6 +1,10 @@
 //! Utilities for checking whether a branch has updated.
 
-use crate::{domain::CommitHash, error::CommitHashError, model::Branch, polling::git::GitFetcher};
+use crate::{
+    domain::CommitHash,
+    model::Branch,
+    polling::{CommitHashError, git::GitFetcher},
+};
 
 /// Enables comparison between a git branch row, and the newly fetched branch.
 pub(super) struct BranchInfo {

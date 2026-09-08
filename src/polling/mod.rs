@@ -7,7 +7,6 @@ use tracing::{info, warn};
 use crate::{
     context::SharedContext,
     engine::AsyncEngine,
-    error::CommitHashError,
     polling::{
         branch::BranchInfo,
         error::{PollingError, handle_polling_error},
@@ -18,6 +17,8 @@ use crate::{
 mod branch;
 mod error;
 pub mod git;
+
+pub use error::CommitHashError;
 
 /// Runs an asynchronous task
 /// that periodically polls git branches in remote repositories.

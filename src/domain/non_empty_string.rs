@@ -1,6 +1,6 @@
 //! Domain type to represent a non-empty string.
 
-use crate::error::ValidationError;
+use crate::domain::ValidationError;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 

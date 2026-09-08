@@ -1,6 +1,6 @@
 //! Domain type to represent a GitHub API version in YYYY-MM-DD format.
 
-use crate::error::ValidationError;
+use crate::domain::ValidationError;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 

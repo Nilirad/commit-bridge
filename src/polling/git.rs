@@ -1,6 +1,6 @@
 //! Operations to fetch and extract git branch data from remote repositories.
 
-use crate::{domain::CommitHash, error::CommitHashError};
+use crate::{domain::CommitHash, polling::CommitHashError};
 use async_trait::async_trait;
 use gix::progress::Discard;
 use gix::remote::Direction;

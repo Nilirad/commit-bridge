@@ -1,63 +1,9 @@
-//! Definitions for common error types.
+//! Definitions for fatal and setup errors.
 
 use crate::repository::RepositoryError;
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
 use config::ConfigError;
-use rovo::aide::OperationOutput;
 use thiserror::Error;
 use validator::ValidationErrors;
-
-/// Validation error.
-#[derive(Debug, Error)]
-pub enum ValidationError {
-    /// Invalid field value.
-    #[error("Validation error: {0}")]
-    InvalidValue(String),
-}
-
-impl IntoResponse for ValidationError {
-    fn into_response(self) -> Response {
-        (StatusCode::UNPROCESSABLE_ENTITY, self.to_string()).into_response()
-    }
-}
-
-/// An error happened inside an Axum handler.
-#[derive(Debug, Error)]
-pub enum HandlerError {
-    /// Database query execution failure.
-    #[error("Repository Error: {0}")]
-    DbQuery(RepositoryError),
-
-    /// Requested resource not found.
-    #[error("Not Found")]
-    NotFound,
-}
-
-impl From<RepositoryError> for HandlerError {
-    fn from(err: RepositoryError) -> Self {
-        match err {
-            RepositoryError::NotFound => HandlerError::NotFound,
-            other => HandlerError::DbQuery(other),
-        }
-    }
-}
-
-impl OperationOutput for HandlerError {
-    type Inner = ();
-}
-
-impl IntoResponse for HandlerError {
-    fn into_response(self) -> Response {
-        let status = match self {
-            HandlerError::DbQuery(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            HandlerError::NotFound => StatusCode::NOT_FOUND,
-        };
-        (status, self.to_string()).into_response()
-    }
-}
 
 /// An error that requires the server to be shut down.
 #[derive(Debug, Error)]
@@ -147,73 +93,3 @@ impl From<dotenvy::Error> for FatalError {
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct ClientCreationError(#[from] reqwest::Error);
-
-/// Error in retrieving a commit or its info using `git ls-remote`.
-#[derive(Debug, Error)]
-pub enum CommitHashError {
-    /// Validation error.
-    #[error("Validation error: {0}")]
-    Validation(#[from] ValidationError),
-
-    /// I/O error while spawning the process.
-    #[error("I/O error in `git ls-remote`: {0}")]
-    Io(#[from] std::io::Error),
-
-    /// Unexpected exit status.
-    #[error("Unexpected `git ls-remote` exit status: {0}")]
-    UnexpectedStatus(String),
-
-    /// Unexpected output format.
-    #[error(
-        "Unexpected `git ls-remote` output format. Repo: {repo_url}; Branch: {branch}; Stdout: {stdout}"
-    )]
-    UnexpectedOutput {
-        /// The process output text.
-        stdout: String,
-        /// The relevant git repository URL.
-        repo_url: String,
-        /// The relevant git branch.
-        branch: String,
-    },
-
-    /// Failed to find remote.
-    #[error("Failed to find remote: {0}")]
-    // Error is boxed because it is very large
-    RemoteAt(Box<gix::remote::init::Error>),
-
-    /// Failed to connect to remote.
-    #[error("Failed to connect to remote: {0}")]
-    // Error is boxed because it is very large
-    Connect(Box<gix::remote::connect::Error>),
-
-    /// Failed to map refs.
-    #[error("Failed to map refs: {0}")]
-    // Error is boxed because it is very large
-    RefMap(Box<gix::remote::ref_map::Error>),
-
-    /// Failed to parse refspec.
-    #[error("Failed to parse refspec: {0}")]
-    RefSpecParse(#[from] gix::refspec::parse::Error),
-
-    /// Git operation failed using gix.
-    #[error("Git operation failed: {0}")]
-    Git(String),
-}
-
-impl From<gix::remote::init::Error> for CommitHashError {
-    fn from(e: gix::remote::init::Error) -> Self {
-        CommitHashError::RemoteAt(Box::new(e))
-    }
-}
-
-impl From<gix::remote::connect::Error> for CommitHashError {
-    fn from(e: gix::remote::connect::Error) -> Self {
-        CommitHashError::Connect(Box::new(e))
-    }
-}
-
-impl From<gix::remote::ref_map::Error> for CommitHashError {
-    fn from(e: gix::remote::ref_map::Error) -> Self {
-        CommitHashError::RefMap(Box::new(e))
-    }
-}

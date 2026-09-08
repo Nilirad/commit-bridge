@@ -1,6 +1,6 @@
 //! Domain type to represent a Git branch name.
 
-use crate::error::ValidationError;
+use crate::domain::ValidationError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use validator::Validate;

@@ -26,7 +26,7 @@ impl GitFetcher for MockGitFetcher {
         &self,
         _repo: &str,
         _branch: &str,
-    ) -> Result<CommitHash, crate::error::CommitHashError> {
+    ) -> Result<CommitHash, crate::polling::CommitHashError> {
         Ok(self.hash.clone())
     }
 }

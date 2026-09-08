@@ -1,6 +1,6 @@
 //! Domain type to represent a GitHub's `repository_dispatch` `event_type`.
 
-use crate::error::ValidationError;
+use crate::domain::ValidationError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
