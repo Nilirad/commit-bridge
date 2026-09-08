@@ -60,7 +60,7 @@ impl GitFetcher for MainGitFetcher {
     ) -> Result<CommitHash, CommitHashError> {
         let result = get_latest_hash_inner(&self.repo, self.timeout, repo_url, branch).await;
         if result.is_err() {
-            tracing::Span::current().record("otel.status_code", "ERROR");
+            crate::telemetry::mark_current_span_error();
         }
         result
     }
